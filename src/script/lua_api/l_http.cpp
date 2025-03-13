@@ -127,9 +127,11 @@ int ModApiHttp::l_http_fetch_sync(lua_State *L)
 int ModApiHttp::l_native_http_fetch_sync(lua_State* L)
 {
 	NO_MAP_LOCK_REQUIRED;
+
 	HTTPFetchRequest req;
 	read_http_fetch_request(L, req);
 	HTTPFetchResult res = NativeHttpModApi::n_http_fetch_sync(req);
+
 	push_http_fetch_result(L, res, true);
 	return 1;
 }
@@ -246,6 +248,7 @@ int ModApiHttp::l_request_http_api(lua_State *L)
 	lua_newtable(L);
 	HTTP_API(fetch_async);
 	HTTP_API(fetch_async_get);
+	HTTP_API(fetch_sync);
 
 	// Stack now looks like this:
 	// <core.http_add_fetch> <table with fetch_async, fetch_async_get>
@@ -295,8 +298,17 @@ int ModApiHttp::l_native_request_http_api(lua_State *L)
 		lua_getfield(L, -1, "http_add_fetch");
 
 		lua_newtable(L);
-		HTTP_API(fetch_async);
-		HTTP_API(fetch_async_get);
+		lua_pushstring(L, "fetch_async");
+		lua_pushcclosure(L, (l_native_http_fetch_async), 0);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "fetch_async_get");
+		lua_pushcclosure(L, (l_native_http_fetch_async_get), 0);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "fetch_sync");
+		lua_pushcclosure(L, (l_native_http_fetch_sync), 0);
+		lua_settable(L, -3);
 
 		// Stack now looks like this:
 		// <core.http_add_fetch> <table with fetch_async, fetch_async_get>
@@ -351,8 +363,10 @@ void ModApiHttp::Initialize(lua_State *L, int top)
 
 	if (isMainmenu) {
 		API_FCT(get_http_api);
+		API_FCT(native_get_http_api);
 	} else {
 		API_FCT(request_http_api);
+		API_FCT(native_request_http_api);
 	}
 
 #endif
@@ -362,5 +376,6 @@ void ModApiHttp::InitializeAsync(lua_State *L, int top)
 {
 #if USE_CURL
 	API_FCT(get_http_api);
+	API_FCT(native_get_http_api);
 #endif
 }

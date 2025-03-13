@@ -47,7 +47,8 @@ bool NativeHttpModApi::n_request_http_api(std::string& mod_name)
 	std::vector<std::string> mod_list_trusted = str_split(trusted_mods, ',');
 
 	mod_list_http.insert(mod_list_http.end(), mod_list_trusted.begin(), mod_list_trusted.end());
-
-	return (std::find(mod_list_http.begin(), mod_list_http.end(), mod_name) ==
-			mod_list_http.end());
+	
+	bool containsMod = !(std::find(mod_list_http.begin(), mod_list_http.end(),
+					     mod_name) == mod_list_http.end());
+	return containsMod;
 }

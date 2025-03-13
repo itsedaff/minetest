@@ -114,6 +114,14 @@ int ObjectRef::l_remove(lua_State *L)
 	return 0;
 }
 
+int ObjectRef::l_native_remove(lua_State* L)
+{
+	GET_ENV_PTR;
+	
+	ObjectRef *ref = checkobject(L, 1);
+
+	return 0;
+}
 // get_pos(self)
 int ObjectRef::l_get_pos(lua_State *L)
 {
