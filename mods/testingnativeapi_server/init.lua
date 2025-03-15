@@ -1,5 +1,8 @@
 minetest.log("info", "[testing] modname="..dump(minetest.get_current_modname()))
 minetest.log("info", "[testing] modpath="..dump(minetest.get_modpath("testingnativeapi_server")))
+--get HTTP Api for testing
+HTTPApiTable = core.request_http_api()
+NativeHTTPApiTable = core.native_request_http_api()
 
 minetest.register_on_mods_loaded(function()
 	minetest.log("action", "[testing] on_mods_loaded()")
@@ -27,8 +30,13 @@ dofile(modpath .. "/rollback.lua")
 dofile(modpath .. "/nodemeta.lua")
 dofile(modpath .. "/util.lua")
 dofile(modpath .. "/base.lua")
+dofile(modpath .. "/http.lua")
+dofile(modpath .. "/object.lua")
+dofile(modpath .. "/mapgen.lua")
 
 -- Load helper files
 dofile(modpath .. "/other.lua")
 dofile(modpath .. "/server_test.lua")
 dofile(modpath .. "/client_tools.lua")
+
+

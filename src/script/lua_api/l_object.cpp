@@ -34,19 +34,20 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "server/luaentity_sao.h"
 #include "server/player_sao.h"
 #include "server/serverinventorymgr.h"
-
+#include "native_api/native_object.h"
+#include <memory>
 /*
 	ObjectRef
 */
 
 
-ObjectRef* ObjectRef::checkobject(lua_State *L, int narg)
+ObjectRef *ObjectRef::checkobject(lua_State *L, int narg)
 {
 	luaL_checktype(L, narg, LUA_TUSERDATA);
 	void *ud = luaL_checkudata(L, narg, className);
 	if (ud == nullptr)
 		luaL_typerror(L, narg, className);
-	return *(ObjectRef**)ud;  // unbox pointer
+	return *(ObjectRef **)ud; // unbox pointer
 }
 
 ServerActiveObject* ObjectRef::getobject(ObjectRef *ref)
@@ -119,9 +120,10 @@ int ObjectRef::l_native_remove(lua_State* L)
 	GET_ENV_PTR;
 	
 	ObjectRef *ref = checkobject(L, 1);
-
+	NativeObjectRef::n_remove(getobject(ref));
 	return 0;
 }
+
 // get_pos(self)
 int ObjectRef::l_get_pos(lua_State *L)
 {
@@ -129,9 +131,20 @@ int ObjectRef::l_get_pos(lua_State *L)
 	ObjectRef *ref = checkobject(L, 1);
 	ServerActiveObject *sao = getobject(ref);
 	if (sao == nullptr)
+		return 0; 
+	push_v3f(L, sao->getBasePosition() / BS);
+	return 1;
+}
+
+int ObjectRef::l_native_get_pos(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	std::unique_ptr<v3f> pos = NativeObjectRef::n_get_pos(getobject(ref));
+	if (pos == nullptr)
 		return 0;
 
-	push_v3f(L, sao->getBasePosition() / BS);
+	push_v3f(L, *pos / BS);
 	return 1;
 }
 
@@ -150,6 +163,18 @@ int ObjectRef::l_set_pos(lua_State *L)
 	return 0;
 }
 
+int ObjectRef::l_native_set_pos(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *sao = getobject(ref);
+	v3f pos = checkFloatPos(L, 2);
+
+	NativeObjectRef::n_set_pos(sao, pos);
+
+	return 0;
+}
+
 // move_to(self, pos, continuous)
 int ObjectRef::l_move_to(lua_State *L)
 {
@@ -163,6 +188,18 @@ int ObjectRef::l_move_to(lua_State *L)
 	bool continuous = readParam<bool>(L, 3);
 
 	sao->moveTo(pos, continuous);
+	return 0;
+}
+
+int ObjectRef::l_native_move_to(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *sao = getobject(ref);
+	v3f pos = checkFloatPos(L, 2);
+	bool continuous = readParam<bool>(L, 3);
+
+	NativeObjectRef::n_move_to(sao, pos, continuous);
 	return 0;
 }
 
@@ -204,6 +241,29 @@ int ObjectRef::l_punch(lua_State *L)
 	return 1;
 }
 
+int ObjectRef::l_native_punch(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *punchee_ref = checkobject(L, 1);
+	ObjectRef *puncher_ref = checkobject(L, 2);
+	ServerActiveObject *punchee = getobject(punchee_ref);
+	ServerActiveObject *puncher = getobject(puncher_ref);
+
+	float time_from_last_punch = readParam<float>(L, 3, 1000000.0f);
+	ToolCapabilities toolcap = read_tool_capabilities(L, 4);
+	v3f dir = readParam<v3f>(
+			L, 5, punchee->getBasePosition() - puncher->getBasePosition());
+	dir.normalize();
+
+	Server *server = getServer(L);
+	std::unique_ptr<u16> wear = NativeObjectRef::n_punch(server, puncher, punchee, toolcap, dir, time_from_last_punch);
+	if (wear == nullptr)
+		return 0;
+	
+	lua_pushnumber(L, *wear);
+	return 1;
+}
+
 // right_click(self, clicker)
 int ObjectRef::l_right_click(lua_State *L)
 {
@@ -216,6 +276,16 @@ int ObjectRef::l_right_click(lua_State *L)
 		return 0;
 
 	sao->rightClick(sao2);
+	return 0;
+}
+
+int ObjectRef::l_native_right_click(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *clicker = checkobject(L, 1);
+	ObjectRef *clickee = checkobject(L, 2);
+
+	NativeObjectRef::n_right_click(getobject(clicker), getobject(clickee));
 	return 0;
 }
 
@@ -253,6 +323,39 @@ int ObjectRef::l_set_hp(lua_State *L)
 	return 0;
 }
 
+int ObjectRef::l_native_set_hp(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *sao = getobject(ref);
+	if (sao == nullptr)
+		return 0;
+
+	int hp = readParam<float>(L, 2);
+	PlayerHPChangeReason reason(PlayerHPChangeReason::SET_HP);
+
+	reason.from_mod = true;
+	if (lua_istable(L, 3)) {
+		lua_pushvalue(L, 3);
+
+		lua_getfield(L, -1, "type");
+		if (lua_isstring(L, -1) &&
+				!reason.setTypeFromString(
+						readParam<std::string>(L, -1))) {
+			errorstream << "Bad type given!" << std::endl;
+		}
+		lua_pop(L, 1);
+
+		reason.lua_reference = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+	Server *server = getServer(L);
+	NativeObjectRef::n_set_hp(server, sao, hp);
+
+	if (reason.hasLuaReference())
+		luaL_unref(L, LUA_REGISTRYINDEX, reason.lua_reference);
+	return 0;
+}
+
 // get_hp(self)
 int ObjectRef::l_get_hp(lua_State *L)
 {
@@ -267,6 +370,15 @@ int ObjectRef::l_get_hp(lua_State *L)
 
 	int hp = sao->getHP();
 
+	lua_pushnumber(L, hp);
+	return 1;
+}
+
+int ObjectRef::l_native_get_hp(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	int hp = NativeObjectRef::n_get_hp(getobject(ref));
 	lua_pushnumber(L, hp);
 	return 1;
 }
@@ -288,6 +400,23 @@ int ObjectRef::l_get_inventory(lua_State *L)
 	return 1;
 }
 
+// get_inventory(self)
+int ObjectRef::l_native_get_inventory(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *sao = getobject(ref);
+	if (sao == nullptr)
+		return 0;
+
+	InventoryLocation loc = NativeObjectRef::n_get_inventory(sao);
+	if (getServerInventoryMgr(L)->getInventory(loc) != nullptr)
+		InvRef::create(L, loc);
+	else
+		lua_pushnil(L); // An object may have no inventory (nil)
+	return 1;
+}
+
 // get_wield_list(self)
 int ObjectRef::l_get_wield_list(lua_State *L)
 {
@@ -299,6 +428,21 @@ int ObjectRef::l_get_wield_list(lua_State *L)
 
 	lua_pushstring(L, sao->getWieldList().c_str());
 	return 1;
+}
+
+int ObjectRef::l_native_get_wield_list(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	std::unique_ptr<std::string> wieldList = NativeObjectRef::n_get_wield_list(getobject(ref));
+
+	if (!wieldList)
+		return 0;
+	else
+	{
+		lua_pushstring(L, (*wieldList).c_str());
+		return 1;
+	}
 }
 
 // get_wield_index(self)
@@ -314,8 +458,37 @@ int ObjectRef::l_get_wield_index(lua_State *L)
 	return 1;
 }
 
+int ObjectRef::l_native_get_wield_index(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	int wieldIndex = NativeObjectRef::n_get_wield_index(getobject(ref));
+	if (wieldIndex == -1)
+		return 0;
+
+	lua_pushinteger(L, wieldIndex + 1);
+	return 1;
+}
+
 // get_wielded_item(self)
 int ObjectRef::l_get_wielded_item(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *sao = getobject(ref);
+	if (sao == nullptr) {
+		// Empty ItemStack
+		LuaItemStack::create(L, ItemStack());
+		return 1;
+	}
+
+	ItemStack selected_item;
+	sao->getWieldedItem(&selected_item, nullptr);
+	LuaItemStack::create(L, selected_item);
+	return 1;
+}
+
+int ObjectRef::l_native_get_wielded_item(lua_State *L)
 {
 	NO_MAP_LOCK_REQUIRED;
 	ObjectRef *ref = checkobject(L, 1);
@@ -351,6 +524,23 @@ int ObjectRef::l_set_wielded_item(lua_State *L)
 	return 1;
 }
 
+int ObjectRef::l_native_set_wielded_item(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *sao = getobject(ref);
+	if (sao == nullptr)
+		return 0;
+
+	ItemStack item = read_item(L, 2, getServer(L)->idef());
+
+	Server *server = getServer(L);
+	bool success = NativeObjectRef::n_set_wielded_item(server, sao, item);
+
+	lua_pushboolean(L, success);
+	return 1;
+}
+
 // set_armor_groups(self, groups)
 int ObjectRef::l_set_armor_groups(lua_State *L)
 {
@@ -376,6 +566,24 @@ int ObjectRef::l_set_armor_groups(lua_State *L)
 	return 0;
 }
 
+int ObjectRef::l_native_set_armor_groups(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *sao = getobject(ref);
+	if (sao == nullptr)
+		return 0;
+
+	ItemGroupList groups;
+
+	read_groups(L, 2, groups);
+	bool printBacktrace = NativeObjectRef::n_set_armor_groups(sao, groups);
+	if (printBacktrace)
+		infostream << script_get_backtrace(L) << std::endl;
+
+	return 0;
+}
+
 // get_armor_groups(self)
 int ObjectRef::l_get_armor_groups(lua_State *L)
 {
@@ -389,6 +597,17 @@ int ObjectRef::l_get_armor_groups(lua_State *L)
 	return 1;
 }
 
+int ObjectRef::l_native_get_armor_groups(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	std::unique_ptr<ItemGroupList> armor_groups = NativeObjectRef::n_get_armor_groups(getobject(ref));
+	if (armor_groups == nullptr)
+		return 0;
+
+	push_groups(L, (*armor_groups));
+	return 1;
+}
 // set_animation(self, frame_range, frame_speed, frame_blend, frame_loop)
 int ObjectRef::l_set_animation(lua_State *L)
 {
@@ -404,6 +623,21 @@ int ObjectRef::l_set_animation(lua_State *L)
 	bool frame_loop   = readParam<bool>(L, 5, true);
 
 	sao->setAnimation(frame_range, frame_speed, frame_blend, frame_loop);
+	return 0;
+}
+
+int ObjectRef::l_native_set_animation(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+
+	v2f frame_range = readParam<v2f>(L, 2, v2f(1, 1));
+	float frame_speed = readParam<float>(L, 3, 15.0f);
+	float frame_blend = readParam<float>(L, 4, 0.0f);
+	bool frame_loop = readParam<bool>(L, 5, true);
+
+	NativeObjectRef::n_set_animation(getobject(ref), frame_range, frame_speed, frame_blend, frame_loop);
+
 	return 0;
 }
 
@@ -429,6 +663,27 @@ int ObjectRef::l_get_animation(lua_State *L)
 	return 4;
 }
 
+int ObjectRef::l_native_get_animation(lua_State* L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+
+	v2f frames = v2f(1, 1);
+	float frame_speed = 15;
+	float frame_blend = 0;
+	bool frame_loop = true;
+
+	int statusCode = NativeObjectRef::n_get_animation(getobject(ref), frames, frame_speed, frame_blend, frame_loop);
+	if (statusCode == 4)
+	{
+		push_v2f(L, frames);
+		lua_pushnumber(L, frame_speed);
+		lua_pushnumber(L, frame_blend);
+		lua_pushboolean(L, frame_loop);
+	}
+	return statusCode;
+}
+
 // set_local_animation(self, idle, walk, dig, walk_while_dig, frame_speed)
 int ObjectRef::l_set_local_animation(lua_State *L)
 {
@@ -450,8 +705,50 @@ int ObjectRef::l_set_local_animation(lua_State *L)
 	return 1;
 }
 
+int ObjectRef::l_native_set_local_animation(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	RemotePlayer *player = getplayer(ref);
+	v2s32 frames[4];
+	for (int i = 0; i < 4; i++) {
+		if (!lua_isnil(L, 2 + 1))
+			frames[i] = read_v2s32(L, 2 + i);
+	}
+	float frame_speed = readParam<float>(L, 6, 30.0f);
+
+	Server *server = getServer(L);
+	bool status = NativeObjectRef::n_set_local_animation(server, player, frames, frame_speed);
+
+	if (status == false)
+		return 0;
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 // get_local_animation(self)
 int ObjectRef::l_get_local_animation(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	RemotePlayer *player = getplayer(ref);
+	if (player == nullptr)
+		return 0;
+
+	v2s32 frames[4];
+	float frame_speed;
+	player->getLocalAnimations(frames, &frame_speed);
+
+	for (const v2s32 &frame : frames) {
+		push_v2s32(L, frame);
+	}
+
+	lua_pushnumber(L, frame_speed);
+	return 5;
+}
+
+int ObjectRef::l_native_get_local_animation(lua_State *L)
 {
 	NO_MAP_LOCK_REQUIRED;
 	ObjectRef *ref = checkobject(L, 1);

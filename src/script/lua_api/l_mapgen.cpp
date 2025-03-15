@@ -757,8 +757,6 @@ int ModApiMapgen::l_native_get_biome_data(lua_State *L)
 	return 1;
 }
 
-// get_mapgen_object(objectname)
-// returns the requested object used during map generation
 int ModApiMapgen::l_get_mapgen_object(lua_State *L)
 {
 	NO_MAP_LOCK_REQUIRED;
