@@ -20,7 +20,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #pragma once
 
 #include "lua_api/l_base.h"
-
+#include "native_api/native_mainmenu.h"
 class AsyncEngine;
 
 /** Implementation of lua api support for mainmenu */
@@ -155,6 +155,104 @@ private:
 
 	// async
 	static int l_do_async_callback(lua_State *L);
+
+	/*Native Functions*/
+
+
+	// api calls
+
+	static int l_native_start(lua_State *L);
+
+	static int l_native_close(lua_State *L);
+
+	static int l_native_create_world(lua_State *L);
+
+	static int l_native_delete_world(lua_State *L);
+
+	static int l_native_get_worlds(lua_State *L);
+
+	static int l_native_get_mapgen_names(lua_State *L);
+
+	static int l_native_gettext(lua_State *L);
+
+	// packages
+
+	static int l_native_get_games(lua_State *L);
+
+	static int l_native_get_content_info(lua_State *L);
+
+	// gui
+
+	static int l_native_show_keys_menu(lua_State *L);
+
+	static int l_native_show_path_select_dialog(lua_State *L);
+
+	static int l_native_set_topleft_text(lua_State *L);
+
+	static int l_native_set_clouds(lua_State *L);
+
+	static int l_native_get_textlist_index(lua_State *L);
+
+	static int l_native_get_table_index(lua_State *L);
+
+	static int l_native_set_background(lua_State *L);
+
+	static int l_native_update_formspec(lua_State *L);
+
+	static int l_native_set_formspec_prepend(lua_State *L);
+
+	static int l_native_get_screen_info(lua_State *L);
+
+	// filesystem
+
+	static int l_native_get_mainmenu_path(lua_State *L);
+
+	static int l_native_get_user_path(lua_State *L);
+
+	static int l_native_get_modpath(lua_State *L);
+
+	static int l_native_get_clientmodpath(lua_State *L);
+
+	static int l_native_get_gamepath(lua_State *L);
+
+	static int l_native_get_texturepath(lua_State *L);
+
+	static int l_native_get_texturepath_share(lua_State *L);
+
+	static int l_native_get_cache_path(lua_State *L);
+
+	static int l_native_get_temp_path(lua_State *L);
+
+	static int l_native_create_dir(lua_State *L);
+
+	static int l_native_delete_dir(lua_State *L);
+
+	static int l_native_copy_dir(lua_State *L);
+
+	static int l_native_is_dir(lua_State *L);
+
+	static int l_native_extract_zip(lua_State *L);
+
+	static int l_native_may_modify_path(lua_State *L);
+
+	static int l_native_download_file(lua_State *L);
+
+	static int l_native_get_video_drivers(lua_State *L);
+
+	static int l_native_get_video_modes(lua_State *L);
+
+	// version compatibility
+	static int l_native_get_min_supp_proto(lua_State *L);
+
+	static int l_native_get_max_supp_proto(lua_State *L);
+
+	// other
+	static int l_native_open_url(lua_State *L);
+
+	static int l_native_open_dir(lua_State *L);
+
+	// async
+	static int l_native_do_async_callback(lua_State *L);
 
 public:
 

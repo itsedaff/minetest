@@ -137,6 +137,7 @@ private:
 class GUIEngine {
 	/** grant ModApiMainMenu access to private members */
 	friend class ModApiMainMenu;
+	friend class NativeModApiMainMenu;
 	friend class ModApiSound;
 
 public:

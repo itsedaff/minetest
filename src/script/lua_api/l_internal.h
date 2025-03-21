@@ -34,6 +34,10 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 		{#bad, [](lua_State *L) -> int {                                    \
 			return l_deprecated_function(L, #good, #bad, &class::l_##good); \
 		}}
+#define luamethod_dep_native(class, good, bad) \
+	{#bad, [](lua_State * L)->int {				\
+		return l_native_deprecated_function(L, #good, #bad, &class::l_##good); \
+	}}
 
 #define luamethod_aliased(class, good, bad) \
 		luamethod(class, good),               \

@@ -25,6 +25,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "server.h"
 #include <algorithm>
 #include <cmath>
+#include "native_api/native_base.h"
 
 ScriptApiBase *ModApiBase::getScriptApiBase(lua_State *L)
 {
@@ -137,3 +138,42 @@ int ModApiBase::l_deprecated_function(lua_State *L, const char *good, const char
 	return func(L);
 }
 
+
+int ModApiBase::l_native_deprecated_function(
+		lua_State *L, const char *good, const char *bad, lua_CFunction func)
+{
+	thread_local std::vector<u64> deprecated_logged;
+
+	DeprecatedHandlingMode dep_mode = get_deprecated_handling_mode();
+	if (dep_mode == DeprecatedHandlingMode::Ignore)
+		return func(L);
+
+	u64 start_time = porting::getTimeUs();
+	lua_Debug ar;
+
+	// Get caller name with line and script backtrace
+	FATAL_ERROR_IF(!lua_getstack(L, 1, &ar), "lua_getstack() failed");
+	FATAL_ERROR_IF(!lua_getinfo(L, "Sl", &ar), "lua_getinfo() failed");
+
+	// Get backtrace and hash it to reduce the warning flood
+	std::string backtrace = ar.short_src;
+	backtrace.append(":").append(std::to_string(ar.currentline));
+	u64 hash = murmur_hash_64_ua(backtrace.data(), backtrace.length(), 0xBADBABE);
+
+	if (std::find(deprecated_logged.begin(), deprecated_logged.end(), hash) ==
+			deprecated_logged.end()) {
+
+		deprecated_logged.emplace_back(hash);
+		warningstream << "Call to deprecated function '" << bad
+			      << "', please use '" << good << "' at " << backtrace
+			      << std::endl;
+
+		if (dep_mode == DeprecatedHandlingMode::Error)
+			script_error(L, LUA_ERRRUN, NULL, NULL);
+	}
+
+	u64 end_time = porting::getTimeUs();
+
+	NativeModApiBase::n_deprecated_function(start_time, end_time, *g_profiler);
+	return func(L);
+}

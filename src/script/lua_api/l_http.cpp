@@ -124,6 +124,18 @@ int ModApiHttp::l_http_fetch_sync(lua_State *L)
 	return 1;
 }
 
+int ModApiHttp::l_native_http_fetch_sync(lua_State* L)
+{
+	NO_MAP_LOCK_REQUIRED;
+
+	HTTPFetchRequest req;
+	read_http_fetch_request(L, req);
+	HTTPFetchResult res = NativeHttpModApi::n_http_fetch_sync(req);
+
+	push_http_fetch_result(L, res, true);
+	return 1;
+}
+
 // http_api.fetch_async(HTTPRequest definition)
 int ModApiHttp::l_http_fetch_async(lua_State *L)
 {
@@ -144,6 +156,17 @@ int ModApiHttp::l_http_fetch_async(lua_State *L)
 	return 1;
 }
 
+int ModApiHttp::l_native_http_fetch_async(lua_State* L)
+{
+	NO_MAP_LOCK_REQUIRED;
+
+	HTTPFetchRequest req;
+	read_http_fetch_request(L, req);
+	std::string caller_handle = NativeHttpModApi::n_http_fetch_async(req);
+
+	lua_pushstring(L, caller_handle.c_str());
+	return 1;
+}
 // http_api.fetch_async_get(handle)
 int ModApiHttp::l_http_fetch_async_get(lua_State *L)
 {
@@ -162,6 +185,18 @@ int ModApiHttp::l_http_fetch_async_get(lua_State *L)
 
 	push_http_fetch_result(L, res, completed);
 
+	return 1;
+}
+
+int ModApiHttp::l_native_http_fetch_async_get(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+
+	std::string handle_str = luaL_checkstring(L, 1);
+	HTTPFetchResult res;
+	bool completed = NativeHttpModApi::n_http_fetch_async_get(handle_str, res);
+
+	push_http_fetch_result(L, res, completed);
 	return 1;
 }
 
@@ -213,6 +248,7 @@ int ModApiHttp::l_request_http_api(lua_State *L)
 	lua_newtable(L);
 	HTTP_API(fetch_async);
 	HTTP_API(fetch_async_get);
+	HTTP_API(fetch_sync);
 
 	// Stack now looks like this:
 	// <core.http_add_fetch> <table with fetch_async, fetch_async_get>
@@ -221,9 +257,70 @@ int ModApiHttp::l_request_http_api(lua_State *L)
 
 	return 1;
 }
+	
+int ModApiHttp::l_native_request_http_api(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+
+	// We have to make sure that this function is being called directly by
+	// a mod, otherwise a malicious mod could override this function and
+	// steal its return value.
+	lua_Debug info;
+
+	// Make sure there's only one item below this function on the stack...
+	if (lua_getstack(L, 2, &info)) {
+		return 0;
+	}
+	FATAL_ERROR_IF(!lua_getstack(L, 1, &info), "lua_getstack() failed");
+	FATAL_ERROR_IF(!lua_getinfo(L, "S", &info), "lua_getinfo() failed");
+
+	// ...and that that item is the main file scope.
+	if (strcmp(info.what, "main") != 0) {
+		return 0;
+	}
+
+	// Mod must be listed in secure.http_mods or secure.trusted_mods
+	lua_rawgeti(L, LUA_REGISTRYINDEX, CUSTOM_RIDX_CURRENT_MOD_NAME);
+	if (!lua_isstring(L, -1)) {
+		return 0;
+	}
+
+	std::string mod_name = readParam<std::string>(L, -1);
+	bool mod_secure_or_trusted = NativeHttpModApi::n_request_http_api(mod_name);
+	if (!mod_secure_or_trusted)
+	{
+		lua_pushnil(L);
+		return 1;
+	} 
+	else
+	{
+		lua_getglobal(L, "core");
+		lua_getfield(L, -1, "http_add_fetch");
+
+		lua_newtable(L);
+		lua_pushstring(L, "fetch_async");
+		lua_pushcclosure(L, (l_native_http_fetch_async), 0);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "fetch_async_get");
+		lua_pushcclosure(L, (l_native_http_fetch_async_get), 0);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "fetch_sync");
+		lua_pushcclosure(L, (l_native_http_fetch_sync), 0);
+		lua_settable(L, -3);
+
+		// Stack now looks like this:
+		// <core.http_add_fetch> <table with fetch_async, fetch_async_get>
+		// Now call core.http_add_fetch to append .fetch(request, callback) to
+		// table
+		lua_call(L, 1, 1);
+		return 1;
+	}
+}
 
 int ModApiHttp::l_get_http_api(lua_State *L)
-{
+	{
 	NO_MAP_LOCK_REQUIRED;
 
 	lua_newtable(L);
@@ -234,6 +331,25 @@ int ModApiHttp::l_get_http_api(lua_State *L)
 	return 1;
 }
 
+int ModApiHttp::l_native_get_http_api(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+
+	lua_newtable(L);
+	lua_pushstring(L, "fetch_async");
+	lua_pushcclosure(L, (l_native_http_fetch_async), 0);
+	lua_settable(L, -3);
+	
+	lua_pushstring(L, "fetch_async_get");
+	lua_pushcclosure(L, (l_native_http_fetch_async_get), 0);
+	lua_settable(L, -3);
+	
+	lua_pushstring(L, "fetch_sync");
+	lua_pushcclosure(L, (l_native_http_fetch_sync), 0);
+	lua_settable(L, -3);
+	
+	return 1;
+}
 #endif
 
 void ModApiHttp::Initialize(lua_State *L, int top)
@@ -247,8 +363,10 @@ void ModApiHttp::Initialize(lua_State *L, int top)
 
 	if (isMainmenu) {
 		API_FCT(get_http_api);
+		API_FCT(native_get_http_api);
 	} else {
 		API_FCT(request_http_api);
+		API_FCT(native_request_http_api);
 	}
 
 #endif
@@ -258,5 +376,6 @@ void ModApiHttp::InitializeAsync(lua_State *L, int top)
 {
 #if USE_CURL
 	API_FCT(get_http_api);
+	API_FCT(native_get_http_api);
 #endif
 }

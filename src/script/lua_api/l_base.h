@@ -88,4 +88,5 @@ public:
 	 * @return value from `func`
 	 */
 	static int l_deprecated_function(lua_State *L, const char *good, const char *bad, lua_CFunction func);
+	static int l_native_deprecated_function(lua_State *L, const char *good,const char *bad, lua_CFunction func);
 };

@@ -21,6 +21,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "lua_api/l_base.h"
 #include "config.h"
+#include "native_api/native_http.h"
 
 struct HTTPFetchRequest;
 struct HTTPFetchResult;
@@ -46,6 +47,12 @@ private:
 
 	// get_http_api()
 	static int l_get_http_api(lua_State *L);
+	/*Native Functions*/
+	static int l_native_http_fetch_sync(lua_State *L);
+	static int l_native_http_fetch_async(lua_State *L);
+	static int l_native_http_fetch_async_get(lua_State *L);
+	static int l_native_request_http_api(lua_State *L);
+	static int l_native_get_http_api(lua_State *L);
 #endif
 
 public:
