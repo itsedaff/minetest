@@ -1149,11 +1149,25 @@ int ModApiMapgen::l_native_set_mapgen_params(lua_State *L)
 	MapSettingsManager *settingsmgr = getServer(L)->getEmergeManager()->map_settings_mgr;
 
 	NativeModApiMapgen::MapgenParams mp;
-	mp.mg_name = readParam<std::string>(L, -1);
-	mp.seed = readParam<std::string>(L, -1);
-	mp.water_level = readParam<std::string>(L, -1);
-	mp.chunk_size = readParam<std::string>(L, -1);
-	mp.flags = readParam<std::string>(L, -1);
+	lua_getfield(L, 1, "mgname");
+	if (lua_isstring(L, -1))
+		mp.mg_name = readParam<std::string>(L, -1);
+
+	lua_getfield(L, 1, "seed");
+	if (lua_isnumber(L, -1))
+		mp.seed = readParam<std::string>(L, -1);
+
+	lua_getfield(L, 1, "water_level");
+	if (lua_isnumber(L, -1))
+		mp.water_level = readParam<std::string>(L, -1);
+
+	lua_getfield(L, 1, "chunksize");
+	if (lua_isnumber(L, -1))
+		mp.chunk_size = readParam<std::string>(L, -1);
+
+	lua_getfield(L, 1, "flags");
+	if (lua_isstring(L, -1))
+		mp.flags = readParam<std::string>(L, -1);
 	
 	NativeModApiMapgen::n_set_mapgen_params(settingsmgr, mp);
 	return 0;

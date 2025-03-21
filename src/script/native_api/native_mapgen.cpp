@@ -136,7 +136,7 @@ NativeModApiMapgen::MapgenParams NativeModApiMapgen::n_get_mapgen_params(MapSett
 	settingsmgr->getMapSetting("seed", &mp.seed);
 	settingsmgr->getMapSetting("water_level", &mp.water_level);
 	settingsmgr->getMapSetting("chunksize", &mp.chunk_size);
-	settingsmgr->getMapSetting("flags", &mp.flags);
+	settingsmgr->getMapSetting("mg_flags", &mp.flags);
 	return mp;
 }
 
@@ -146,7 +146,7 @@ void NativeModApiMapgen::n_set_mapgen_params(MapSettingsManager *settingsmgr, Ma
 	settingsmgr->setMapSetting("seed", mp.seed, true);
 	settingsmgr->setMapSetting("water_level", mp.water_level, true);
 	settingsmgr->setMapSetting("chunksize", mp.chunk_size, true);
-	settingsmgr->setMapSetting("flags", mp.flags, true);
+	settingsmgr->setMapSetting("mg_flags", mp.flags, true);
 }
 //will return false if retrieval unsuccessful
 bool NativeModApiMapgen::n_get_mapgen_setting(MapSettingsManager *settingsmgr, const char *name, std::string& setting)

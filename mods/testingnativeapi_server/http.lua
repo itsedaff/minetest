@@ -97,7 +97,7 @@ core.register_chatcommand("native_http_fetch_sync",
 })
 
 --make this helper because subsequent sync requests don't use the same IP address
-function CompareTables(table1, table2)
+function CompareTablesMod(table1, table2)
     local identical = true
     for i, v in pairs(table1) do
         if table2[i] ~= v and i ~= "data" then identical = false 
@@ -118,7 +118,7 @@ core.register_chatcommand("test_http_fetch_sync",
     func = function(self)
         local res = HTTPApiTable.fetch_sync(HTTPreq)
         local nativeRes = NativeHTTPApiTable.fetch_sync(HTTPreq)
-        local tablesSame = CompareTables(res, nativeRes)
+        local tablesSame = CompareTablesMod(res, nativeRes)
         if tablesSame then return true, "Responses are identical"
         else return false, "Responses are not identical:\n"..dump(res).."\n"..dump(nativeRes) end
     end
