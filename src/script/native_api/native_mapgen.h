@@ -91,7 +91,7 @@ public:
 	static void n_set_gen_notify(EmergeManager *emerge, const bool change_notify, const u32 flags, const u32 flagmask, std::vector<u32> deco_ids);
 	static std::vector<u32> n_get_gen_notify(const EmergeManager *emerge);
 	static bool n_get_decoration_id(const char *deco_string, const DecorationManager *dmgr, int& deco_id);
-	static bool n_register_biome(BiomeManager *bmgr, Biome *biome, ObjDefHandle& handle);
+	static ObjDefHandle n_register_biome(BiomeManager *bmgr, Biome *biome);
 	static ObjDefHandle n_register_decoration(const NodeDefManager* ndef, DecorationManager* decomgr, Decoration *deco);
 	static ObjDefHandle n_register_ore(const NodeDefManager *ndef, OreManager *oremgr, Ore* ore);
 	static ObjDefHandle n_register_schematic(SchematicManager* schemmgr, Schematic* schem);

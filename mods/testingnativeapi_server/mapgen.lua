@@ -117,6 +117,66 @@ core.native_set_mapgen_setting_noiseparams("water_level", defaultNoiseparams, tr
 
 sameValue_noiseparams = (dump(luaNoiseparams) == dump(nativeNoiseparams))
 
+--test register_biome
+local testBiome = {
+    name = "testbiome",
+    depth_top = 1,
+    node_filler = "default:snowblock",
+    depth_filler = 3,
+    node_stone = "default:cave_ice",
+    node_water_top = "default:ice",
+    depth_water_top = 10,
+    node_top = "default:snowblock",
+    node_riverbed = "default:gravel",
+    depth_riverbed = 5,
+    node_dungeon = "default:ice",
+    node_dungeon_stair = "stairs:stair_ice",
+    heat_point = 23,
+    humidity_point = 73,
+    node_dust = "default:snowblock",
+    node_river_water = "default:ice",
+    y_max = 31000,
+    y_min = -8
+}
+
+local biomeTest = {
+    name = "biometest",
+    depth_top = 1,
+    node_filler = "default:snowblock",
+    depth_filler = 3,
+    node_stone = "default:cave_ice",
+    node_water_top = "default:ice",
+    depth_water_top = 10,
+    node_top = "default:snowblock",
+    node_riverbed = "default:gravel",
+    depth_riverbed = 5,
+    node_dungeon = "default:ice",
+    node_dungeon_stair = "stairs:stair_ice",
+    heat_point = 23,
+    humidity_point = 73,
+    node_dust = "default:snowblock",
+    node_river_water = "default:ice",
+    y_max = 31000,
+    y_min = -8
+}
+
+
+core.register_biome(testBiome)
+local luaRegisteredBiome = nil
+for _, v in pairs(core.registered_biomes) do
+    if v.name == "testbiome" then luaRegisteredBiome = v end
+end
+core.unregister_biome("testbiome")
+
+
+core.register_biome(testBiome)
+local nativeRegisteredBiome = nil
+for _, v in pairs(core.registered_biomes) do
+    if v.name == "testbiome" then nativeRegisteredBiome = v end
+end
+core.unregister_biome("testbiome")
+
+
 --normal test commands
 core.register_chatcommand("lua_get_biome_data", 
 {
@@ -641,16 +701,38 @@ core.register_chatcommand("get_decorations",
     end
 })
 
---finish after testing get_decoration_id
+--[[
+tested behavior: Always starts with dungeon, temple, decoration by default
+subsequent set commands can add flags, but not remove them. Same goes for flags.
+]]--
 core.register_chatcommand("lua_set_gen_notify", {
     description="Invokes lua_api > set_gen_notify",
     func = function (self)
-        local initGenNotify = core.get_gen_notify()
-        core.set_gen_notify("dungeon, temple, decoration", {22})
-        local genNotify = core.get_gen_notify()
-        core.set_gen_notify("dungeon, temple, cave_begin, cave_end, large_cave_begin, large_cave_end, decoration", {})
-        if dump(initGenNotify) ~= dump(genNotify) then return true, "Set gen notify table"
-        else return false, "Did not set gen notify table"..dump(initGenNotify)..dump(genNotify) end
+        --always starts with dungeon, temple, decoration by default
+        core.set_gen_notify("dungeon, temple, decoration, cave_begin", {22})
+        local luaFlagString, idTable = core.get_gen_notify()
+        if string.find(luaFlagString, "cave_begin") and TableContains(idTable, 22) then return true, "Gen notify updated"
+        else return false, "Gen notify not updated"..dump(core.get_gen_notify()) end
+    end
+})
+
+core.register_chatcommand("native_set_gen_notify", {
+    description="Invokes native_api > set_gen_notify",
+    func = function (self)
+        core.set_gen_notify("dungeon, temple, decoration, cave_begin, cave_end", {9})
+        local flagString, idTable = core.get_gen_notify()
+        if string.find(flagString, "cave_end") and TableContains(idTable, 9) then return true, "Gen notify updated"
+        else return false, "Did not set gen notify table"..dump(core.get_gen_notify()) end
+    end
+})
+
+--just checks that both things were added because no way to reset table during runtime
+core.register_chatcommand("test_set_gen_notify", {
+    description="Compares lua and native API set_gen_notify output",
+    func = function (self)
+        local flagString, idTable = core.get_gen_notify()
+        if string.find(flagString, "cave_begin") and string.find(flagString, "cave_end") and TableContains(idTable, 22) and TableContains(idTable, 9) then 
+        return true, "Native and Lua functions modified gen notify successfully" else return false, "At least one function did not modify gen notify successfully"..dump(core.get_gen_notify()) end
     end
 })
 
@@ -689,7 +771,7 @@ core.register_chatcommand("lua_get_decoration_id",
 {
     description="Invokes lua_api > get_decoration_id",
     func = function ()
-        local id = core.get_decoration_id("default:grass_5")
+        local id = core.get_decoration_id("default:pine_log")
         if id then return true, "Decoration id: "..id 
         else return false, "Function returned nil" end
     end
@@ -699,7 +781,7 @@ core.register_chatcommand("native_get_decoration_id",
 {
     description="Invokes native_api > get_decoration_id",
     func = function ()
-        local id = core.native_get_decoration_id("default:grass_5")
+        local id = core.native_get_decoration_id("default:pine_log")
         if id then return true, "Decoration id: "..id 
         else return false, "Function returned nil" end
     end
@@ -709,9 +791,49 @@ core.register_chatcommand("test_get_decoration_id",
 {
     description="Compares Lua and native get_decoration_id",
     func = function ()
-        local id = core.native_get_decoration_id("default:grass_5")
-        local nativeId = core.native_get_decoration_id("default:grass_5")
+        local id = core.native_get_decoration_id("default:pine_log")
+        local nativeId = core.native_get_decoration_id("default:pine_log")
         if id == nativeId then return true, "Function outputs were identical. Id: "..id
         else return false, "Function outputs were different \n id: "..id.."\n native id: "..nativeId end
+    end
+})
+
+--helper function to retrieve biomes
+core.register_chatcommand("get_biomes",
+{
+    description="Helper command - writes all registered decorations to file",
+    func = function(self)
+        local f = io.open("../../biomes.txt", "w")
+        f:write(dump(core.registered_biomes))
+        return true
+    end
+})
+
+
+
+core.register_chatcommand("lua_register_biome", 
+{
+    description="Invokes lua_api > register_biome",
+    func = function(self)
+        if luaRegisteredBiome then return true, "Biome was registered"..dump(luaRegisteredBiome)
+        else return false, "Biome not registered" end
+    end
+})
+
+core.register_chatcommand("native_register_biome", 
+{
+    description="Invokes native_api > register_biome",
+    func = function(self)
+        if nativeRegisteredBiome then return true, "Biome was registered"..dump(nativeRegisteredBiome)
+        else return false, "Biome not registered" end
+    end
+})
+
+core.register_chatcommand("test_register_biome", 
+{
+    description="Tests output of Lua and native APIs",
+    func = function(self)
+        if dump(luaRegisteredBiome) == dump(nativeRegisteredBiome) then return true, "Registered biomes are identical"
+        else return false, "Registered biomes are not identical"..dump(luaRegisteredBiome)..dump(nativeRegisteredBiome) end
     end
 })

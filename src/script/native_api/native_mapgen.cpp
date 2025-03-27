@@ -231,17 +231,15 @@ bool NativeModApiMapgen::n_get_decoration_id(const char *deco_string, const Deco
 	return true;
 }
 
-bool NativeModApiMapgen::n_register_biome(BiomeManager* bmgr, Biome* biome, ObjDefHandle& handle)
+ObjDefHandle NativeModApiMapgen::n_register_biome(BiomeManager* bmgr, Biome* biome)
 {
-	if (biome == nullptr)
-		return false;
-	handle = bmgr->add(biome);
+	ObjDefHandle handle = bmgr->add(biome);
 	if (handle == OBJDEF_INVALID_HANDLE)
 	{
 		delete biome;
-		return false;
+		return handle;
 	}
-	return true;
+	return handle;
 }
 
 ObjDefHandle NativeModApiMapgen::n_register_decoration(const NodeDefManager *ndef, DecorationManager *decomgr, Decoration *deco)

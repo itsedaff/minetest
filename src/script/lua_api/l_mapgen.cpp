@@ -1440,7 +1440,7 @@ int ModApiMapgen::l_native_set_gen_notify(lua_State *L)
 		lua_pushnil(L);
 		while (lua_next(L, 2)) {
 			if (lua_isnumber(L, -1))
-				deco_ids.push_back(lua_tonumber(L, -1));	
+				deco_ids.push_back((u32)lua_tonumber(L, -1));	
 			lua_pop(L, 1);
 		}
 	}
@@ -1564,13 +1564,13 @@ int ModApiMapgen::l_native_register_biome(lua_State *L)
 	const NodeDefManager *ndef = getServer(L)->getNodeDefManager();
 	BiomeManager *bmgr = getServer(L)->getEmergeManager()->getWritableBiomeManager();
 	Biome *biome = read_biome_def(L, index, ndef);
-	ObjDefHandle handle;
-
-	bool res = NativeModApiMapgen::n_register_biome(bmgr, biome, handle);
-	if (!res)
+	if (!biome)
 		return 0;
+	
+	ObjDefHandle handle = NativeModApiMapgen::n_register_biome(bmgr, biome);
 
-	lua_pushinteger(L, handle);
+	if (handle)
+		lua_pushinteger(L, handle);
 	return 1;
 }
 
