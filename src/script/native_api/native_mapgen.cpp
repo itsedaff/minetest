@@ -246,10 +246,10 @@ ObjDefHandle NativeModApiMapgen::n_register_decoration(const NodeDefManager *nde
 {
 	ndef->pendNodeResolve(deco);	
 	ObjDefHandle handle = decomgr->add(deco);
-	if (!handle)
+	if (handle == OBJDEF_INVALID_HANDLE)
 	{
 		delete deco;
-		return OBJDEF_INVALID_HANDLE;
+		return handle;
 	}
 
 	return handle;
@@ -259,10 +259,10 @@ ObjDefHandle NativeModApiMapgen::n_register_ore(const NodeDefManager* ndef, OreM
 {
 	ndef->pendNodeResolve(ore);
 	ObjDefHandle handle = oremgr->add(ore);
-	if (!handle)
+	if (handle == OBJDEF_INVALID_HANDLE)
 	{
 		delete ore;
-		return OBJDEF_INVALID_HANDLE;
+		return handle;
 	}
 
 	return handle;

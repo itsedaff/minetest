@@ -1557,7 +1557,6 @@ int ModApiMapgen::l_register_biome(lua_State *L)
 int ModApiMapgen::l_native_register_biome(lua_State *L)
 {
 	NO_MAP_LOCK_REQUIRED;
-
 	int index = 1;
 	luaL_checktype(L, index, LUA_TTABLE);
 
@@ -1569,9 +1568,13 @@ int ModApiMapgen::l_native_register_biome(lua_State *L)
 	
 	ObjDefHandle handle = NativeModApiMapgen::n_register_biome(bmgr, biome);
 
-	if (handle)
+	if (handle == OBJDEF_INVALID_HANDLE)
+		return 0;
+	else
+	{
 		lua_pushinteger(L, handle);
-	return 1;
+		return 1;
+	}
 }
 
 // register_decoration({lots of stuff})
@@ -2113,9 +2116,6 @@ int ModApiMapgen::l_native_register_ore(lua_State *L)
 	ore->m_nnlistsizes.push_back(nnames);
 
 	ObjDefHandle handle = NativeModApiMapgen::n_register_ore(ndef, oremgr, ore);
-	if (handle == OBJDEF_INVALID_HANDLE)
-		return 0;
-
 	lua_pushinteger(L, handle);
 	return 1;
 }
