@@ -6,6 +6,8 @@ InitEnvVars = assert(loadfile(modpath.."/env.lua", "t"))
 InitEnvVars()
 os.remove(_G["Path"])
 CompareTables = _G["CompareTables"]
+Log = _G["Log"]
+os.remove("logfile.txt")
 --collects data from APIs that only work on mapgen threads
 MapgenObj = nil
 NativeMapgenObj = nil
@@ -149,7 +151,7 @@ if core.registered_biomes["testbiome"] then luaRegisteredBiome = core.registered
 core.clear_registered_biomes()
 f:write(dump(core.registered_biomes).."\n")
 
-local nativeRes = core.native_register_biome(testBiome)
+local nativeRes = core.register_biome(testBiome)
 f:write(nativeRes..dump(core.registered_biomes).."\n")
 local nativeRegisteredBiome
 if core.registered_biomes["testbiome"] then nativeRegisteredBiome = core.registered_biomes["testbiome"] end
@@ -157,13 +159,18 @@ core.clear_registered_biomes()
 f:write(dump(core.registered_biomes).."\n")
 
 --[[
-Tests:
+Attempted solutions: 
 lua works and native doesn't work when you swap the function bodies
 lua works and native doesn't work when both have lua bodies
 lua works and native doesn't work when both have native bodies
+Test works if you use core.register_biome twice
 native function is registered with same macro as other, working functions
 doesn't work if macro is expanded
-behavior appears normal (table fields have correct values) when stepping through debugger and a valid handle is returned
+behavior appears normal when stepping through debugger (table fields have correct values) and a valid handle is returned
+changing function name doesn't work
+native function correctly returns nil if biome has already been registered
+created a new function called "test_func" with copied and pasted lua function body, did not work
+checked if Lua function body had been accidentally modified, is identical to repository version before first commit
 ]]
 --test register_decoration
 
@@ -364,22 +371,47 @@ local testOreCleared = (luaOreCleared and nativeOreCleared)
 core.clear_registered_ores();
 
 --test generate_ores
-local luaOres
-local nativeOres
+local luaOres 
+local nativeOres 
 local tested = false
+local oresSame = true
 core.register_ore(testOre)
+--must register ore block type as node too to identify it from block data
+
+local testOreId = 83
 core.register_on_generated(
     function (minp, maxp, blockseed)
-        local vmanip = core.get_mapgen_object("voxelmanip") 
-        core.generate_ores(vmanip, minp, maxp)
-        vmanip:write_to_map()
-        local tempOres = core.find_nodes_in_area(minp, maxp, "testore")
-        for i, v in ipairs(tempOres) do
-            luaOres[i] = v
+        if not tested then
+            Log(tostring(tested)) 
+            local vmanip = VoxelManip(minp, maxp)
+            local origData = vmanip:get_data()
+
+            core.generate_ores(vmanip, minp, maxp)
+            vmanip:write_to_map()
+            luaOres = vmanip:get_data()
+            f = io.open("vmanipdata.txt", "w+")
+            f:write(dump(luaOres))
+            vmanip:set_data(origData)
+            
+            --checks if ores are generated, will skip if not
+            local idCt = 0
+            for _, v in pairs(luaOres) do
+                if v == testOreId then idCt = idCt + 1 end
+            end
+            if idCt > 0 then
+                core.native_generate_ores(vmanip, minp, maxp)
+                vmanip:write_to_map()
+                nativeOres = vmanip:get_data()
+                f:write(dump(nativeOres))
+                vmanip:set_data(origData)
+                tested = true
+                if dump(luaOres) == dump(nativeOres) then oresSame = true end
+            end
         end
     end
 )
 core.clear_registered_ores()
+
 
 --normal test commands
 core.register_chatcommand("lua_get_biome_data", 
@@ -1236,15 +1268,16 @@ core.register_chatcommand("test_clear_registered_schematics",
 core.register_chatcommand("lua_generate_ores", {
     description="Invokes lua_api > generate_ores",
     func = function (self)
-        if luaOres then return true, "Lua ores generated \n"..dump(luaOres)
-        else return false, "Lua ores not generated" end
+        local id = core.get_content_id("default:diamondblock")
+        if luaOres then return true, "Lua ores generated \n"
+        else return false, "Lua ores not generated"..id end
     end
 })
 
 core.register_chatcommand("native_generate_ores", {
     description="Invokes native_api > generate_ores",
     func = function (self)
-        if nativeOres then return true, "Native ores generated \n"..dump(nativeOres)
+        if nativeOres then return true, "Native ores generated \n"
         else return false, "Native ores not generated" end
     end
 })

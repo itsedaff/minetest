@@ -1552,6 +1552,30 @@ int ModApiMapgen::l_register_biome(lua_State *L)
 	lua_pushinteger(L, handle);
 	return 1;
 }
+//same as lua register biome
+int ModApiMapgen::l_test_func(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+
+	int index = 1;
+	luaL_checktype(L, index, LUA_TTABLE);
+
+	const NodeDefManager *ndef = getServer(L)->getNodeDefManager();
+	BiomeManager *bmgr = getServer(L)->getEmergeManager()->getWritableBiomeManager();
+
+	Biome *biome = read_biome_def(L, index, ndef);
+	if (!biome)
+		return 0;
+
+	ObjDefHandle handle = bmgr->add(biome);
+	if (handle == OBJDEF_INVALID_HANDLE) {
+		delete biome;
+		return 0;
+	}
+
+	lua_pushinteger(L, handle);
+	return 1;
+}
 
 int ModApiMapgen::l_native_register_biome(lua_State *L)
 {
@@ -1566,12 +1590,12 @@ int ModApiMapgen::l_native_register_biome(lua_State *L)
 	Biome *biome = read_biome_def(L, index, ndef);
 	if (!biome)
 		return 0;
-
-	ObjDefHandle handle = NativeModApiMapgen::n_register_biome(bmgr, biome);
-	if (handle == OBJDEF_INVALID_HANDLE) {
+	ObjDefHandle handle = bmgr->add(biome);
+	if (handle == OBJDEF_INVALID_HANDLE)
+	{
+		delete biome;
 		return 0;
 	}
-
 	lua_pushinteger(L, handle);
 	return 1;
 }
@@ -2960,7 +2984,7 @@ void ModApiMapgen::Initialize(lua_State *L, int top)
 	API_FCT(place_schematic_on_vmanip);
 	API_FCT(serialize_schematic);
 	API_FCT(read_schematic);
-
+	registerFunction(L, "test_func", l_test_func, top);
 	/*NATIVE FUNCTIONS*/
 
 	API_FCT(native_get_biome_id);

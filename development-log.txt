@@ -1,1 +1,2 @@
 Attempted to solve native object registration and clearing - 4hr
+Attempted to solve previous issue and added logging utility- 1hr 30 min
