@@ -200,16 +200,16 @@ private:
 	// returns the decoration ID as used in gennotify
 	static int l_native_get_decoration_id(lua_State *L);
 
-	// register_biome({lots of stuff})
+	// native_register_biome({lots of stuff})
 	static int l_native_register_biome(lua_State *L);
-
-	// register_decoration({lots of stuff})
+	static int l_test_func(lua_State *L);
+	// native_register_decoration({lots of stuff})
 	static int l_native_register_decoration(lua_State *L);
 
-	// register_ore({lots of stuff})
+	// native_register_ore({lots of stuff})
 	static int l_native_register_ore(lua_State *L);
 
-	// register_schematic({schematic}, replacements={})
+	// native_register_schematic({schematic}, replacements={})
 	static int l_native_register_schematic(lua_State *L);
 
 	// clear_registered_biomes()

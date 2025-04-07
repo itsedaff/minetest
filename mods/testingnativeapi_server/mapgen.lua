@@ -6,6 +6,8 @@ InitEnvVars = assert(loadfile(modpath.."/env.lua", "t"))
 InitEnvVars()
 os.remove(_G["Path"])
 CompareTables = _G["CompareTables"]
+Log = _G["Log"]
+os.remove("logfile.txt")
 --collects data from APIs that only work on mapgen threads
 MapgenObj = nil
 NativeMapgenObj = nil
@@ -13,7 +15,6 @@ core.register_on_generated(
 function(minp, maxp, blockseed)
     if MapgenObj == nil then MapgenObj = core.get_mapgen_object("voxelmanip") end
     if NativeMapgenObj == nil then NativeMapgenObj = core.native_get_mapgen_object("voxelmanip") end
-
 end)
 
 --functions that can only be called on init go here
@@ -139,42 +140,277 @@ local testBiome = {
     y_min = -8
 }
 
-local biomeTest = {
-    name = "biometest",
-    depth_top = 1,
-    node_filler = "default:snowblock",
-    depth_filler = 3,
-    node_stone = "default:cave_ice",
-    node_water_top = "default:ice",
-    depth_water_top = 10,
-    node_top = "default:snowblock",
-    node_riverbed = "default:gravel",
-    depth_riverbed = 5,
-    node_dungeon = "default:ice",
-    node_dungeon_stair = "stairs:stair_ice",
-    heat_point = 23,
-    humidity_point = 73,
-    node_dust = "default:snowblock",
-    node_river_water = "default:ice",
+os.remove("biomes.txt")
+local f = io.open("biomes.txt", "a+")
+
+f:write(dump(core.registered_biomes).."\n")
+local luaRes = core.register_biome(testBiome)
+f:write(luaRes..dump(core.registered_biomes).."\n")
+local luaRegisteredBiome
+if core.registered_biomes["testbiome"] then luaRegisteredBiome = core.registered_biomes["testbiome"] end
+core.clear_registered_biomes()
+f:write(dump(core.registered_biomes).."\n")
+
+local nativeRes = core.register_biome(testBiome)
+f:write(nativeRes..dump(core.registered_biomes).."\n")
+local nativeRegisteredBiome
+if core.registered_biomes["testbiome"] then nativeRegisteredBiome = core.registered_biomes["testbiome"] end
+core.clear_registered_biomes()
+f:write(dump(core.registered_biomes).."\n")
+
+--[[
+Attempted solutions: 
+lua works and native doesn't work when you swap the function bodies
+lua works and native doesn't work when both have lua bodies
+lua works and native doesn't work when both have native bodies
+Test works if you use core.register_biome twice
+native function is registered with same macro as other, working functions
+doesn't work if macro is expanded
+behavior appears normal when stepping through debugger (table fields have correct values) and a valid handle is returned
+changing function name doesn't work
+native function correctly returns nil if biome has already been registered
+created a new function called "test_func" with copied and pasted lua function body, did not work
+checked if Lua function body had been accidentally modified, is identical to repository version before first commit
+]]
+--test register_decoration
+
+local testDeco = {
+    deco_type = "simple",
+    place_on = "default:dirt_with_grass, default:water",
+
+    sidelen = 8,
+    fill_ratio = 0.02,
+    noise_params = {
+        offset = 0,
+        scale = 0.45,
+        spread = {x = 100, y = 100, z = 100},
+        seed = 354,
+        octaves = 3,
+        persist = 0.7,
+        lacunarity = 2.0,
+        flags = "absvalue"
+    },
+    biomes = {"Oceanside", "Hills", "Plains"},
+    y_min = -31000,
     y_max = 31000,
-    y_min = -8
+    spawn_by = "default:water",
+    num_spawn_by = 1,
+    flags = "liquid_surface, force_placement, all_floors, all_ceilings",
+    decoration = "default:diamondblock",
+    height = 1,
+    height_max = 0,
+    param2 = 0,
+    param2_max = 0,
+    place_offset_y = 0,
+    schematic = {
+        size = {x = 4, y = 6, z = 4},
+        data = {
+            {name = "default:cobble", param1 = 255, param2 = 0},
+            {name = "default:dirt_with_grass", param1 = 255, param2 = 0},
+            {name = "air", param1 = 255, param2 = 0},
+             ...
+        },
+        yslice_prob = {
+            {ypos = 2, prob = 128},
+            {ypos = 5, prob = 64},
+             ...
+        },
+    },
+    rotation = "90",
+
 }
 
+local luaHandle = core.register_decoration(testDeco)
+local luaDeco
+if luaHandle then luaDeco = core.registered_decorations[luaHandle] end
+core.clear_registered_decorations()
+
+local nativeHandle = core.native_register_decoration(testDeco)
+local nativeDeco
+if nativeHandle then nativeDeco = core.registered_decorations[nativeHandle] end
+core.clear_registered_decorations()
+
+
+--test register_ore
+
+local testOre = {
+    name = "testore",
+    ore_type = "scatter",
+    ore = "default:diamondblock",
+    ore_param2 = 3,
+    wherein = "default:stone",
+    clust_scarcity = 2,
+    clust_num_ores = 10,
+    clust_size = 3,
+    y_min = -31000,
+    y_max = 31000,
+    flags = "",
+    noise_threshold = 0.5,
+    noise_params = {
+        offset = 0,
+        scale = 1,
+        spread = {x = 100, y = 100, z = 100},
+        seed = 23,
+        octaves = 3,
+        persist = 0.7
+    },
+    biomes = {"desert", "rainforest", "Oceanside", "Hills", "Plains"},
+    column_height_min = 1,
+    column_height_max = 16,
+    column_midpoint_factor = 0.5,
+    np_puff_top = {
+        offset = 4,
+        scale = 2,
+        spread = {x = 100, y = 100, z = 100},
+        seed = 47,
+        octaves = 3,
+        persist = 0.7
+    },
+    np_puff_bottom = {
+        offset = 4,
+        scale = 2,
+        spread = {x = 100, y = 100, z = 100},
+        seed = 11,
+        octaves = 3,
+        persist = 0.7
+    },
+    random_factor = 1.0,
+    np_stratum_thickness = {
+        offset = 8,
+        scale = 4,
+        spread = {x = 100, y = 100, z = 100},
+        seed = 17,
+        octaves = 3,
+        persist = 0.7
+    },
+    stratum_thickness = 8,
+}
+
+core.register_ore(testOre)
+local luaOre = core.registered_ores["testore"]
+core.clear_registered_ores()
+
+
+core.native_register_ore(testOre)
+local nativeOre = core.registered_ores["testore"]
+core.clear_registered_ores()
+
+--test register_schematic
+
+local testSchematic = {
+    name = "testschematic",
+	size = {x = 3, y = 3, z = 3},
+	data = {
+		-- The side of the bush, with the air on top
+		{name = "default:bush_leaves"}, {name = "default:bush_leaves"}, {name = "default:bush_leaves"}, -- lower layer
+		{name = "default:bush_leaves"}, {name = "default:bush_leaves"}, {name = "default:bush_leaves"}, -- middle layer
+		{name = "air"}, {name = "air"}, {name = "air"}, -- top layer
+		-- The center of the bush, with stem at the base and a pointy leave 2 nodes above
+		{name = "default:bush_leaves"}, {name = "default:bush_stem"}, {name = "default:bush_leaves"}, -- lower layer
+		{name = "default:bush_leaves"}, {name = "default:bush_leaves"}, {name = "default:bush_leaves"}, -- middle layer
+		{name = "air"}, {name = "default:bush_leaves"}, {name = "air"}, -- top layer
+		-- The other side of the bush, same as first side
+		{name = "default:bush_leaves"}, {name = "default:bush_leaves"}, {name = "default:bush_leaves"}, -- lower layer
+		{name = "default:bush_leaves"}, {name = "default:bush_leaves"}, {name = "default:bush_leaves"}, -- middle layer
+		{name = "air"}, {name = "air"}, {name = "air"}, -- top layer
+	}
+}
+
+--issue: registered schematics table is not available at init time?
+local luaSchematic
+core.register_schematic(testSchematic)
+--luaSchematic = minetest.registered_schematics["testschematic"]
+core.clear_registered_schematics()
+
+local nativeSchematic
+core.register_schematic(testSchematic)
+--nativeSchematic = minetest.registered_schematics["testschematic"]
+core.clear_registered_schematics()
+
+--test clear_registered_biomes
+core.clear_registered_biomes()
 
 core.register_biome(testBiome)
-local luaRegisteredBiome = nil
-for _, v in pairs(core.registered_biomes) do
-    if v.name == "testbiome" then luaRegisteredBiome = v end
-end
-core.unregister_biome("testbiome")
-
+core.clear_registered_biomes()
+local luaBiomeCleared = (core.registered_biomes["testbiome"] == nil)
 
 core.register_biome(testBiome)
-local nativeRegisteredBiome = nil
-for _, v in pairs(core.registered_biomes) do
-    if v.name == "testbiome" then nativeRegisteredBiome = v end
-end
-core.unregister_biome("testbiome")
+core.native_clear_registered_biomes()
+local nativeBiomeCleared = (core.registered_biomes["testbiome"] == nil)
+
+local testBiomeCleared = (luaBiomeCleared and nativeBiomeCleared)
+
+--test clear_registered_decorations
+core.clear_registered_decorations()
+
+luaHandle = core.register_decoration(testDeco)
+core.clear_registered_decorations()
+local luaDecoCleared = (core.registered_decorations[luaHandle] == nil)
+
+nativeHandle = core.register_decoration(testDeco)
+core.native_clear_registered_decorations()
+local nativeDecoCleared = (core.registered_decorations[nativeHandle] == nil)
+
+local testDecoCleared = (luaDecoCleared and nativeDecoCleared)
+
+core.clear_registered_decorations()
+
+--test clear_registered_ores
+core.clear_registered_ores()
+
+core.register_ore(testOre)
+core.clear_registered_ores()
+local luaOreCleared = (core.registered_ores["testore"] == nil)
+
+nativeHandle = core.register_ore(testOre)
+core.native_clear_registered_ores()
+local nativeOreCleared = (core.registered_ores["testore"] == nil)
+
+local testOreCleared = (luaOreCleared and nativeOreCleared)
+
+core.clear_registered_ores();
+
+--test generate_ores
+local luaOres 
+local nativeOres 
+local tested = false
+local oresSame = true
+core.register_ore(testOre)
+--must register ore block type as node too to identify it from block data
+
+local testOreId = 83
+core.register_on_generated(
+    function (minp, maxp, blockseed)
+        if not tested then
+            Log(tostring(tested)) 
+            local vmanip = VoxelManip(minp, maxp)
+            local origData = vmanip:get_data()
+
+            core.generate_ores(vmanip, minp, maxp)
+            vmanip:write_to_map()
+            luaOres = vmanip:get_data()
+            f = io.open("vmanipdata.txt", "w+")
+            f:write(dump(luaOres))
+            vmanip:set_data(origData)
+            
+            --checks if ores are generated, will skip if not
+            local idCt = 0
+            for _, v in pairs(luaOres) do
+                if v == testOreId then idCt = idCt + 1 end
+            end
+            if idCt > 0 then
+                core.native_generate_ores(vmanip, minp, maxp)
+                vmanip:write_to_map()
+                nativeOres = vmanip:get_data()
+                f:write(dump(nativeOres))
+                vmanip:set_data(origData)
+                tested = true
+                if dump(luaOres) == dump(nativeOres) then oresSame = true end
+            end
+        end
+    end
+)
+core.clear_registered_ores()
 
 
 --normal test commands
@@ -202,7 +438,7 @@ core.register_chatcommand("native_get_biome_data",
     end
 })
 
-core.register_chatcommand("lua_test_get_biome_data", 
+core.register_chatcommand("test_get_biome_data", 
 {
     description = "Compares output of lua and native get_biome_data",
     func = function (self)
@@ -809,8 +1045,6 @@ core.register_chatcommand("get_biomes",
     end
 })
 
-
-
 core.register_chatcommand("lua_register_biome", 
 {
     description="Invokes lua_api > register_biome",
@@ -833,7 +1067,225 @@ core.register_chatcommand("test_register_biome",
 {
     description="Tests output of Lua and native APIs",
     func = function(self)
-        if dump(luaRegisteredBiome) == dump(nativeRegisteredBiome) then return true, "Registered biomes are identical"
+        if dump(luaRegisteredBiome) == dump(nativeRegisteredBiome) and luaRegisteredBiome ~= nil then return true, "Registered biomes are identical"
         else return false, "Registered biomes are not identical"..dump(luaRegisteredBiome)..dump(nativeRegisteredBiome) end
+    end
+})
+
+core.register_chatcommand("lua_register_decoration", 
+{
+    description = "Invokes lua_api > register_decoration",
+    func = function(self)
+        if luaDeco then return true, "Lua decoration registered"..dump(luaDeco)
+        else return false, "Lua decoration not registered" end
+    end
+})
+
+core.register_chatcommand("native_register_decoration", 
+{
+    description = "Invokes native_api > register_decoration",
+    func = function(self)
+        if nativeDeco then return true, "Native decoration registered"..dump(nativeDeco)
+        else return false, "Native decoration not registered" end
+    end
+})
+
+core.register_chatcommand("test_register_decoration",
+{
+    description = "Compares output of Lua and native register_decoration",
+    func = function (self)
+        if dump(luaDeco) == dump(nativeDeco) and luaDeco ~= nil then return true, "Lua and native decos identical"
+        else return false, "Lua and native decos different"..dump(luaDeco)..dump(nativeDeco) end
+    end
+})
+
+core.register_chatcommand("lua_register_ore", 
+{
+    description = "Invokes lua_api > register_ore",
+    func = function(self)
+        if luaOre then return true, "Lua ore registered"..dump(luaOre)
+        else return false, "Lua ore not registered" end
+    end
+})
+
+
+core.register_chatcommand("native_register_ore", 
+{
+    description = "Invokes native_api > register_ore",
+    func = function(self)
+        if nativeOre then return true, "Native ore registered"..dump(nativeOre)
+        else return false, "Native ore not registered" end
+    end
+})
+
+core.register_chatcommand("test_register_ore",
+{
+    description = "Compares output of lua and native registered ores",
+    func = function (self)
+        if dump(luaOre) == dump(nativeOre) and luaOre ~= nil then return true, "Lua and native ores identical"
+        else return false, "Lua and native ores different"..dump(luaOre)..dump(nativeOre) end
+    end
+})
+
+
+core.register_chatcommand("lua_register_schematic", 
+{
+    description = "Invokes lua_api > register_schematic",
+    func = function(self)
+        if luaSchematic then return true, "Lua schematic registered"..dump(luaSchematic)
+        else return false, "Lua schematic not registered" end
+    end
+})
+
+
+core.register_chatcommand("native_register_schematic", 
+{
+    description = "Invokes native_api > register_ore",
+    func = function(self)
+        if nativeSchematic then return true, "Native ore registered"..dump(nativeSchematic)
+        else return false, "Native ore not registered" end
+    end
+})
+
+core.register_chatcommand("test_register_schematic",
+{
+    description = "Compares output of lua and native registered ores",
+    func = function (self)
+        if dump(luaSchematic) == dump(nativeSchematic) and luaSchematic ~= nil then return true, "Lua and native ores identical"
+        else return false, "Lua and native ores different"..dump(luaSchematic)..dump(nativeSchematic) end
+    end
+})
+
+core.register_chatcommand("lua_clear_registered_biomes", 
+{
+    description = "Invokes lua_api > clear_registered_biomes",
+    func = function(self)
+        if luaBiomeCleared then return true, "Lua function clears biome"
+        else return false, "Lua function did not clear biome" end
+    end
+})
+
+core.register_chatcommand("native_clear_registered_biomes", 
+{
+    description = "Invokes native_api > clear_registered_biomes",
+    func = function(self)
+        if nativeBiomeCleared then return true, "Native function clears biome"
+        else return false, "Native function did not clear biome" end
+    end
+})
+
+core.register_chatcommand("test_clear_registered_biomes", 
+{
+    description = "Tests both lua and native functions",
+    func = function (self)
+        if testBiomeCleared then return true, "Both registered biomes cleared"
+        else return false, "One or more registered biomes did not clear \n lua: "..tostring(luaBiomeCleared).."\n native: "..tostring(nativeBiomeCleared) end  
+    end
+})
+
+core.register_chatcommand("lua_clear_registered_decorations", 
+{
+    description = "Invokes lua_api > clear_registered_decorations",
+    func = function(self)
+        if luaDecoCleared then return true, "Lua function clears decorations"
+        else return false, "Lua function did not clear decorations" end
+    end
+})
+
+core.register_chatcommand("native_clear_registered_decorations", 
+{
+    description = "Invokes native_api > clear_registered_decorations",
+    func = function(self)
+        if nativeDecoCleared then return true, "Native function clears decorations"
+        else return false, "Native function did not clear decorations" end
+    end
+})
+
+core.register_chatcommand("test_clear_registered_decorations", 
+{
+    description = "Tests both lua and native functions",
+    func = function (self)
+        if testDecoCleared then return true, "Both registered decorations cleared"
+        else return false, "One or more registered decorations did not clear \n lua: "..tostring(luaDecoCleared).."\n native: "..tostring(nativeDecoCleared) end
+    end
+})
+
+
+core.register_chatcommand("lua_clear_registered_ores", 
+{
+    description = "Invokes lua_api > clear_registered_ores",
+    func = function(self)
+        if luaOreCleared then return true, "Lua function clears ores"
+        else return false, "Lua function did not clear ores" end
+    end
+})
+
+core.register_chatcommand("native_clear_registered_ores", 
+{
+    description = "Invokes native_api > clear_registered_ores",
+    func = function(self)
+        if nativeOreCleared then return true, "Native function clears ores"
+        else return false, "Native function did not clear ores" end
+    end
+})
+
+core.register_chatcommand("test_clear_registered_ores", 
+{
+    description = "Tests both lua and native functions",
+    func = function (self)
+        if testOreCleared then return true, "Both registered ores cleared"
+        else return false, "One or more registered ores did not clear \n lua: "..tostring(luaOreCleared).."\n native: "..tostring(nativeOreCleared) end
+    end
+})
+
+core.register_chatcommand("lua_clear_registered_schematics", 
+{
+    description = "Invokes lua_api > clear_registered_schematics",
+    func = function(self)
+        if luaOreCleared then return true, "Lua function clears schematics"
+        else return false, "Lua function did not clear schematics" end
+    end
+})
+
+core.register_chatcommand("native_clear_registered_schematics", 
+{
+    description = "Invokes native_api > clear_registered_schematics",
+    func = function(self)
+        if nativeOreCleared then return true, "Native function clears schematics"
+        else return false, "Native function did not clear schematics" end
+    end
+})
+
+core.register_chatcommand("test_clear_registered_schematics", 
+{
+    description = "Tests both lua and native functions",
+    func = function (self)
+        if testOreCleared then return true, "Both registered schematics cleared"
+        else return false, "One or more registered schematics did not clear \n lua: "..tostring(luaOreCleared).."\n native: "..tostring(nativeOreCleared) end
+    end
+})
+
+core.register_chatcommand("lua_generate_ores", {
+    description="Invokes lua_api > generate_ores",
+    func = function (self)
+        local id = core.get_content_id("default:diamondblock")
+        if luaOres then return true, "Lua ores generated \n"
+        else return false, "Lua ores not generated"..id end
+    end
+})
+
+core.register_chatcommand("native_generate_ores", {
+    description="Invokes native_api > generate_ores",
+    func = function (self)
+        if nativeOres then return true, "Native ores generated \n"
+        else return false, "Native ores not generated" end
+    end
+})
+
+core.register_chatcommand("test_generate_ores", {
+    description="Compares output of lua and native generated ores",
+    func = function (self)
+        if luaOres ~= nil and dump(luaOres) == dump(nativeOres) then return true, "Lua and native ores are the same"
+        else return false, "Lua and native ores are not the same" end
     end
 })

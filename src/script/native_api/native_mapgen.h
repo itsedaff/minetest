@@ -1,3 +1,6 @@
+#include "lua_api/l_mapgen.h"
+#include "lua_api/l_internal.h"
+#include "lua_api/l_vmanip.h"
 #include "common/c_converter.h"
 #include "common/c_content.h"
 #include "cpp_api/s_security.h"
@@ -14,6 +17,7 @@
 #include "filesys.h"
 #include "settings.h"
 #include "log.h"
+#include "objdef.h"
 #include <memory>
 #include "mapnode.h"
 
