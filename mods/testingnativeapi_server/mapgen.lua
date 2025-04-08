@@ -179,7 +179,7 @@ checked if Lua function body had accidentally been modified, is identical to rep
 
 local testDeco = {
     deco_type = "simple",
-    place_on = "default:dirt_with_grass, default:water",
+    place_on = "default:dirt_with_grass, default:water, default:stone",
     name = "testdeco",
     sidelen = 8,
     fill_ratio = 0.02,
@@ -193,34 +193,12 @@ local testDeco = {
         lacunarity = 2.0,
         flags = "absvalue"
     },
-    biomes = {"Oceanside", "Hills", "Plains"},
     y_min = -31000,
     y_max = 31000,
-    spawn_by = "default:water",
-    num_spawn_by = 1,
     flags = "liquid_surface, force_placement, all_floors, all_ceilings",
-    decoration = "default:diamondblock",
+    decoration = "default:dirt_with_grass",
     height = 1,
-    height_max = 0,
-    param2 = 0,
-    param2_max = 0,
-    place_offset_y = 0,
-    schematic = {
-        size = {x = 4, y = 6, z = 4},
-        data = {
-            {name = "default:cobble", param1 = 255, param2 = 0},
-            {name = "default:dirt_with_grass", param1 = 255, param2 = 0},
-            {name = "air", param1 = 255, param2 = 0},
-             ...
-        },
-        yslice_prob = {
-            {ypos = 2, prob = 128},
-            {ypos = 5, prob = 64},
-             ...
-        },
-    },
-    rotation = "90",
-
+    height_max = 2,
 }
 
 local luaHandle = core.register_decoration(testDeco)
@@ -340,9 +318,6 @@ local tested = false
 local oresSame = false
 core.register_ore(testOre)
 
---Log(core.get_mapgen_object("vmanip"):get_data())
---Log(core.get_content_id("testore"))
---local origData = vmanip:get_data()
 --sets entire map to a block for testing (except for air blocks)
 SetMap = function (blockname, vmanip)
     local blocks = vmanip:get_data()
@@ -373,6 +348,20 @@ core.register_on_generated(
     end
 )
 
+--test generate_decorations
+core.register_decoration(testDeco)
+
+--helper function that resets a node to air (assumes that decoration is a node)
+SetNodeToAir = function(nodename, vmanip)
+    local nodeId = core.get_content_id(nodename)
+    local airId = core.get_content_id("air")
+    local blocks = vmanip:get_data()
+    for i, v in pairs(blocks) do 
+        if v == nodeId then blocks[i] = airId end
+    end
+    vmanip:set_data(blocks)
+    vmanip:write_to_map()
+end
 
 --helper function to retrieve biomes
 core.register_chatcommand("get_biomes",
