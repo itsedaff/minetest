@@ -151,7 +151,7 @@ if core.registered_biomes["testbiome"] then luaRegisteredBiome = core.registered
 core.clear_registered_biomes()
 f:write(dump(core.registered_biomes).."\n")
 
-local nativeRes = core.register_biome(testBiome)
+local nativeRes = core.test_func(testBiome)
 f:write(nativeRes..dump(core.registered_biomes).."\n")
 local nativeRegisteredBiome
 if core.registered_biomes["testbiome"] then nativeRegisteredBiome = core.registered_biomes["testbiome"] end
@@ -159,25 +159,28 @@ core.clear_registered_biomes()
 f:write(dump(core.registered_biomes).."\n")
 
 --[[
-Attempted solutions: 
+Attempted solutions/observations: 
 lua works and native doesn't work when you swap the function bodies
 lua works and native doesn't work when both have lua bodies
 lua works and native doesn't work when both have native bodies
-Test works if you use core.register_biome twice
+Test works if you use core.register_biome twice regardless of function body content
 native function is registered with same macro as other, working functions
-doesn't work if macro is expanded
-behavior appears normal when stepping through debugger (table fields have correct values) and a valid handle is returned
-changing function name doesn't work
+expanding macro doesn't work
+behavior appears normal when stepping through debugger (table fields have correct values) and a valid handle is returned, but no biome is registered
+registering the function also appears normal when stepping though debugger, with working references to native function
 native function correctly returns nil if biome has already been registered
-created a new function called "test_func" with copied and pasted lua function body, did not work
-checked if Lua function body had been accidentally modified, is identical to repository version before first commit
-]]
+new function called "test_func" with copied and pasted lua function body did not work
+changing the name of l_register_biome worked
+changing the l_register_biome's registration macro to reference the native function worked.
+changing l_native_get_biome_data's function registration to reference the original lua function did not work
+checked if Lua function body had accidentally been modified, is identical to repository version before first Cacti Council commit
+]]--
 --test register_decoration
 
 local testDeco = {
     deco_type = "simple",
     place_on = "default:dirt_with_grass, default:water",
-
+    name = "testdeco",
     sidelen = 8,
     fill_ratio = 0.02,
     noise_params = {
@@ -235,55 +238,14 @@ core.clear_registered_decorations()
 
 local testOre = {
     name = "testore",
-    ore_type = "scatter",
-    ore = "default:diamondblock",
-    ore_param2 = 3,
+    y_max = 31,
     wherein = "default:stone",
-    clust_scarcity = 2,
-    clust_num_ores = 10,
-    clust_size = 3,
     y_min = -31000,
-    y_max = 31000,
-    flags = "",
-    noise_threshold = 0.5,
-    noise_params = {
-        offset = 0,
-        scale = 1,
-        spread = {x = 100, y = 100, z = 100},
-        seed = 23,
-        octaves = 3,
-        persist = 0.7
-    },
-    biomes = {"desert", "rainforest", "Oceanside", "Hills", "Plains"},
-    column_height_min = 1,
-    column_height_max = 16,
-    column_midpoint_factor = 0.5,
-    np_puff_top = {
-        offset = 4,
-        scale = 2,
-        spread = {x = 100, y = 100, z = 100},
-        seed = 47,
-        octaves = 3,
-        persist = 0.7
-    },
-    np_puff_bottom = {
-        offset = 4,
-        scale = 2,
-        spread = {x = 100, y = 100, z = 100},
-        seed = 11,
-        octaves = 3,
-        persist = 0.7
-    },
-    random_factor = 1.0,
-    np_stratum_thickness = {
-        offset = 8,
-        scale = 4,
-        spread = {x = 100, y = 100, z = 100},
-        seed = 17,
-        octaves = 3,
-        persist = 0.7
-    },
-    stratum_thickness = 8,
+    clust_scarcity = 1,
+    clust_num_ores = 1,
+    ore_type = "scatter",
+    clust_size = 1,
+    ore = "default:diamondblock"
 }
 
 core.register_ore(testOre)
@@ -371,47 +333,78 @@ local testOreCleared = (luaOreCleared and nativeOreCleared)
 core.clear_registered_ores();
 
 --test generate_ores
-local luaOres 
-local nativeOres 
+--function simply checks if both functions generate ores because generation is not deterministic
+local luaOres = false
+local nativeOres = false
 local tested = false
-local oresSame = true
+local oresSame = false
 core.register_ore(testOre)
---must register ore block type as node too to identify it from block data
 
-local testOreId = 83
+--Log(core.get_mapgen_object("vmanip"):get_data())
+--Log(core.get_content_id("testore"))
+--local origData = vmanip:get_data()
+--sets entire map to a block for testing (except for air blocks)
+SetMap = function (blockname, vmanip)
+    local blocks = vmanip:get_data()
+    local blockId = core.get_content_id(blockname)
+    local airId = core.get_content_id("air")
+    for i, v in pairs(blocks) do
+        if v ~= airId then blocks[i] = blockId end
+    end
+    vmanip:set_data(blocks)
+    vmanip:write_to_map()
+end
+
 core.register_on_generated(
     function (minp, maxp, blockseed)
-        if not tested then
-            Log(tostring(tested)) 
-            local vmanip = VoxelManip(minp, maxp)
-            local origData = vmanip:get_data()
+        local vmanip = core.get_mapgen_object("voxelmanip")
+        local testId = core.get_content_id("default:diamondblock")
+        SetMap("default:stone", vmanip)
+        core.generate_ores(vmanip, minp, maxp)
+        local currData = vmanip:get_data()
+        luaOres = TableContains(currData, testId)
+        vmanip:write_to_map()
 
-            core.generate_ores(vmanip, minp, maxp)
-            vmanip:write_to_map()
-            luaOres = vmanip:get_data()
-            f = io.open("vmanipdata.txt", "w+")
-            f:write(dump(luaOres))
-            vmanip:set_data(origData)
-            
-            --checks if ores are generated, will skip if not
-            local idCt = 0
-            for _, v in pairs(luaOres) do
-                if v == testOreId then idCt = idCt + 1 end
-            end
-            if idCt > 0 then
-                core.native_generate_ores(vmanip, minp, maxp)
-                vmanip:write_to_map()
-                nativeOres = vmanip:get_data()
-                f:write(dump(nativeOres))
-                vmanip:set_data(origData)
-                tested = true
-                if dump(luaOres) == dump(nativeOres) then oresSame = true end
-            end
-        end
+        SetMap("default:stone", vmanip)
+        --core.native_generate_ores(vmanip, minp, maxp) causes error
+        currData = vmanip:get_data()
+        nativeOres = TableContains(currData, testId)
+        vmanip:write_to_map()
     end
 )
-core.clear_registered_ores()
 
+
+--helper function to retrieve biomes
+core.register_chatcommand("get_biomes",
+{
+    description="Helper command - writes all registered biomes to file",
+    func = function(self)
+        local f = io.open("biomes.txt", "w")
+        f:write(dump(core.registered_biomes))
+        return true
+    end
+})
+--helper function to retrieve ores
+core.register_chatcommand("get_ores",
+{
+    description="Helper command - writes all registered ores to file",
+    func = function(self)
+        local f = io.open("ores.txt", "w")
+        f:write(dump(core.registered_ores))
+        return true
+    end
+})
+
+--helper function to retrieve nodes
+core.register_chatcommand("get_nodes",
+{
+    description="Helper command - writes all registered nodes to file",
+    func = function(self)
+        local f = io.open("nodes.txt", "w")
+        f:write(dump(core.registered_ores))
+        return true
+    end
+})
 
 --normal test commands
 core.register_chatcommand("lua_get_biome_data", 
@@ -1034,17 +1027,6 @@ core.register_chatcommand("test_get_decoration_id",
     end
 })
 
---helper function to retrieve biomes
-core.register_chatcommand("get_biomes",
-{
-    description="Helper command - writes all registered decorations to file",
-    func = function(self)
-        local f = io.open("../../biomes.txt", "w")
-        f:write(dump(core.registered_biomes))
-        return true
-    end
-})
-
 core.register_chatcommand("lua_register_biome", 
 {
     description="Invokes lua_api > register_biome",
@@ -1269,8 +1251,8 @@ core.register_chatcommand("lua_generate_ores", {
     description="Invokes lua_api > generate_ores",
     func = function (self)
         local id = core.get_content_id("default:diamondblock")
-        if luaOres then return true, "Lua ores generated \n"
-        else return false, "Lua ores not generated"..id end
+        if luaOres then return true, "Lua ores generated"
+        else return false, "Lua ores not generated" end
     end
 })
 
@@ -1285,7 +1267,35 @@ core.register_chatcommand("native_generate_ores", {
 core.register_chatcommand("test_generate_ores", {
     description="Compares output of lua and native generated ores",
     func = function (self)
-        if luaOres ~= nil and dump(luaOres) == dump(nativeOres) then return true, "Lua and native ores are the same"
+        if oresSame then return true, "Lua and native ores are the same"
         else return false, "Lua and native ores are not the same" end
     end
+})
+
+core.register_chatcommand("lua_generate_decorations", {
+    description="Invokes lua_api > generate_decorations",
+    func = function (self)
+        if luaDecos then return true, "Lua decorations generated \n"
+        else return false, "Lua decorations not generated" end
+    end
+})
+
+core.register_chatcommand("native_generate_decorations", {
+    description="Invokes native_api > generate_decorations",
+    func = function (self)
+        if nativeDecos then return true, "Native decorations generated \n"
+        else return false, "Native decorations not generated" end
+    end
+})
+
+core.register_chatcommand("test_generate_decorations", {
+    description="Compares output of lua and native generated decorations",
+    func = function (self)
+        if luaDecos ~= nil and dump(luaDecos) == dump(nativeDecos) then return true, "Lua and native decorations are the same"
+        else return false, "Lua and native ores are not the same" end
+    end
+})
+
+core.register_chatcommand("lua_create_schematic", {
+
 })

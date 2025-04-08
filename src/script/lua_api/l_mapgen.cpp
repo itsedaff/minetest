@@ -1543,7 +1543,7 @@ int ModApiMapgen::l_register_biome(lua_State *L)
 	if (!biome)
 		return 0;
 
-	ObjDefHandle handle = bmgr->add(biome);
+	ObjDefHandle handle = NativeModApiMapgen::n_register_biome(bmgr, biome);
 	if (handle == OBJDEF_INVALID_HANDLE) {
 		delete biome;
 		return 0;
@@ -1590,14 +1590,15 @@ int ModApiMapgen::l_native_register_biome(lua_State *L)
 	Biome *biome = read_biome_def(L, index, ndef);
 	if (!biome)
 		return 0;
-	ObjDefHandle handle = bmgr->add(biome);
-	if (handle == OBJDEF_INVALID_HANDLE)
-	{
-		delete biome;
+
+	ObjDefHandle handle = NativeModApiMapgen::n_register_biome(bmgr, biome);
+	if (handle == OBJDEF_INVALID_HANDLE) {
 		return 0;
 	}
+
 	lua_pushinteger(L, handle);
 	return 1;
+
 }
 
 // register_decoration({lots of stuff})
@@ -2984,9 +2985,9 @@ void ModApiMapgen::Initialize(lua_State *L, int top)
 	API_FCT(place_schematic_on_vmanip);
 	API_FCT(serialize_schematic);
 	API_FCT(read_schematic);
-	registerFunction(L, "test_func", l_test_func, top);
-	/*NATIVE FUNCTIONS*/
+	API_FCT(test_func);
 
+	/*NATIVE FUNCTIONS*/
 	API_FCT(native_get_biome_id);
 	API_FCT(native_get_biome_name);
 	API_FCT(native_get_heat);
@@ -3005,7 +3006,7 @@ void ModApiMapgen::Initialize(lua_State *L, int top)
 	API_FCT(native_set_gen_notify);
 	API_FCT(native_get_gen_notify);
 	API_FCT(native_get_decoration_id);
-	API_FCT(native_register_biome);
+	registerFunction(L, "native_register_biome", l_native_register_biome, top);
 	API_FCT(native_register_decoration);
 	API_FCT(native_register_ore);
 	API_FCT(native_register_schematic);
