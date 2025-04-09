@@ -2737,7 +2737,7 @@ int ModApiMapgen::l_serialize_schematic(lua_State *L)
 
 	if (was_loaded)
 		delete schem;
-
+	
 	std::string ser = os.str();
 	lua_pushlstring(L, ser.c_str(), ser.length());
 	return 1;
@@ -2774,8 +2774,8 @@ int ModApiMapgen::l_native_serialize_schematic(lua_State* L)
 		string_to_enum(es_SchematicFormatType, schem_format, enumstr);
 
 	//// Serialize to binary string, using nullptr as error message
-	std::unique_ptr<std::string> ser = NativeModApiMapgen::n_serialize_schematic(schem, schem_format, use_comments, indent_spaces);
-	if (!ser)
+	std::string ser = NativeModApiMapgen::n_serialize_schematic(schem, schem_format, use_comments, indent_spaces);
+	if (ser == "")
 		return 0;
 
 	if (was_loaded)
@@ -2783,7 +2783,7 @@ int ModApiMapgen::l_native_serialize_schematic(lua_State* L)
 
 	else
 	{
-		lua_pushlstring(L, (*ser).c_str(), (*ser).length());
+		lua_pushlstring(L, ser.c_str(), ser.length());
 		return 1;
 	}
 
@@ -3006,7 +3006,7 @@ void ModApiMapgen::Initialize(lua_State *L, int top)
 	API_FCT(native_set_gen_notify);
 	API_FCT(native_get_gen_notify);
 	API_FCT(native_get_decoration_id);
-	registerFunction(L, "native_register_biome", l_native_register_biome, top);
+	API_FCT(native_serialize_schematic);
 	API_FCT(native_register_decoration);
 	API_FCT(native_register_ore);
 	API_FCT(native_register_schematic);
