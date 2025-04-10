@@ -389,7 +389,7 @@ NativeModApiMapgen::SchematicFieldData NativeModApiMapgen::n_read_schematic(
 		//stores name as pointer to string in stored pointer to array to save memory
 		nd.name = &(*sfd.names)[schem->schemdata[i].getContent()];
 		nd.param2 = node.getParam2();
-		sfd.mapNode_params.push_back(nd);
+		sfd.mapNode_params[i] = nd;
 	}
 
 	return sfd;

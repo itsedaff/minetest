@@ -49,7 +49,7 @@ public:
 	
 	struct NodeData
 	{
-		std::string *name;
+		std::string* name;
 		bool force_place;
 		u8 probability;
 		u8 param2;

@@ -1385,6 +1385,7 @@ core.register_chatcommand("test_serialize_schematic", {
     end
 })
 
+--both lua and nil read as nil for some reason
 core.register_chatcommand("lua_read_schematic", {
     description="Invokes lua_api > read_schematic",
     func = function (self)
@@ -1393,19 +1394,10 @@ core.register_chatcommand("lua_read_schematic", {
         else return false, "Lua function returned nil" end
     end
 })
---[[
-lua output should be: 
-{
-prob=254,
-param2=0,
-name="air",
-ypos=2
-}
-]]
 core.register_chatcommand("native_read_schematic", {
     description="Invokes native_api > read_schematic",
     func = function (self)
-        local schem = core.native_read_schematic(testSchem, {})
+        local schem = core.native_read_schematic("luaschem.mts", {})
         if schem ~= nil then return true, "Schematic read correctly"
         else return false, "Native function returned nil" end
     end
@@ -1414,8 +1406,8 @@ core.register_chatcommand("native_read_schematic", {
 core.register_chatcommand("test_read_schematic", {
     description="Tests output of Lua and native read_schematic",
     func = function (self)
-        local luaSchem = core.read_schematic(testSchem, {})
-        local nativeSchem = core.native_read_schematic(testSchem, {})
+        local luaSchem = core.read_schematic("luaschem.mts", {})
+        local nativeSchem = core.native_read_schematic("luaschem.mts", {})
         if luaSchem ~= nil and dump(luaSchem) == dump(testSchem) then return true, "Lua and native schematics identical"
         else return false, "Lua schematic:\n"..dump(luaSchem).."Native schematic: "..dump(nativeSchem) end
     end
