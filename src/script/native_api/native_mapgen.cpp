@@ -333,22 +333,21 @@ bool NativeModApiMapgen::n_place_schematic_on_vmanip(MMVManip *v, Schematic *s, 
 	return s->placeOnVManip(v, p, flags, rot, force_placement);
 }
 
-std::unique_ptr<std::string> NativeModApiMapgen::n_serialize_schematic(const Schematic* s, const int fmt, const bool use_comments, const u32 indent_spaces)
+std::string NativeModApiMapgen::n_serialize_schematic(const Schematic* s, const int fmt, const bool use_comments, const u32 indent_spaces)
 {
-	std::unique_ptr<std::string> res;
+	std::string res = "";
 	std::ostringstream os(std::ios_base::binary);
 	switch (fmt) {
 	case SCHEM_FMT_MTS:
 		s->serializeToMts(&os, s->m_nodenames);
 		break;
 	case SCHEM_FMT_LUA:
-		s->serializeToLua(
-				&os, s->m_nodenames, use_comments, indent_spaces);
+		s->serializeToLua(&os, s->m_nodenames, use_comments, indent_spaces);
 		break;
 	default:
 		return res;
 	}
-	res = std::make_unique<std::string>(os.str());
+	res = os.str();
 	return res;
 }
 
@@ -390,7 +389,7 @@ NativeModApiMapgen::SchematicFieldData NativeModApiMapgen::n_read_schematic(
 		//stores name as pointer to string in stored pointer to array to save memory
 		nd.name = &(*sfd.names)[schem->schemdata[i].getContent()];
 		nd.param2 = node.getParam2();
-		sfd.mapNode_params.push_back(nd);
+		sfd.mapNode_params[i] = nd;
 	}
 
 	return sfd;

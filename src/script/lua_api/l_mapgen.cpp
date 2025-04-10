@@ -1543,7 +1543,7 @@ int ModApiMapgen::l_register_biome(lua_State *L)
 	if (!biome)
 		return 0;
 
-	ObjDefHandle handle = bmgr->add(biome);
+	ObjDefHandle handle = NativeModApiMapgen::n_register_biome(bmgr, biome);
 	if (handle == OBJDEF_INVALID_HANDLE) {
 		delete biome;
 		return 0;
@@ -1590,14 +1590,15 @@ int ModApiMapgen::l_native_register_biome(lua_State *L)
 	Biome *biome = read_biome_def(L, index, ndef);
 	if (!biome)
 		return 0;
-	ObjDefHandle handle = bmgr->add(biome);
-	if (handle == OBJDEF_INVALID_HANDLE)
-	{
-		delete biome;
+
+	ObjDefHandle handle = NativeModApiMapgen::n_register_biome(bmgr, biome);
+	if (handle == OBJDEF_INVALID_HANDLE) {
 		return 0;
 	}
+
 	lua_pushinteger(L, handle);
 	return 1;
+
 }
 
 // register_decoration({lots of stuff})
@@ -2736,7 +2737,7 @@ int ModApiMapgen::l_serialize_schematic(lua_State *L)
 
 	if (was_loaded)
 		delete schem;
-
+	
 	std::string ser = os.str();
 	lua_pushlstring(L, ser.c_str(), ser.length());
 	return 1;
@@ -2773,8 +2774,8 @@ int ModApiMapgen::l_native_serialize_schematic(lua_State* L)
 		string_to_enum(es_SchematicFormatType, schem_format, enumstr);
 
 	//// Serialize to binary string, using nullptr as error message
-	std::unique_ptr<std::string> ser = NativeModApiMapgen::n_serialize_schematic(schem, schem_format, use_comments, indent_spaces);
-	if (!ser)
+	std::string ser = NativeModApiMapgen::n_serialize_schematic(schem, schem_format, use_comments, indent_spaces);
+	if (ser == "")
 		return 0;
 
 	if (was_loaded)
@@ -2782,7 +2783,7 @@ int ModApiMapgen::l_native_serialize_schematic(lua_State* L)
 
 	else
 	{
-		lua_pushlstring(L, (*ser).c_str(), (*ser).length());
+		lua_pushlstring(L, ser.c_str(), ser.length());
 		return 1;
 	}
 
@@ -2793,8 +2794,7 @@ int ModApiMapgen::l_read_schematic(lua_State *L)
 {
 	NO_MAP_LOCK_REQUIRED;
 
-	const SchematicManager *schemmgr =
-		getServer(L)->getEmergeManager()->getSchematicManager();
+	const SchematicManager *schemmgr = getServer(L)->getEmergeManager()->getSchematicManager();
 
 	//// Read options
 	std::string write_yslice = getstringfield_default(L, 2, "write_yslice_prob", "all");
@@ -2984,9 +2984,9 @@ void ModApiMapgen::Initialize(lua_State *L, int top)
 	API_FCT(place_schematic_on_vmanip);
 	API_FCT(serialize_schematic);
 	API_FCT(read_schematic);
-	registerFunction(L, "test_func", l_test_func, top);
-	/*NATIVE FUNCTIONS*/
+	API_FCT(test_func);
 
+	/*NATIVE FUNCTIONS*/
 	API_FCT(native_get_biome_id);
 	API_FCT(native_get_biome_name);
 	API_FCT(native_get_heat);
@@ -3005,7 +3005,7 @@ void ModApiMapgen::Initialize(lua_State *L, int top)
 	API_FCT(native_set_gen_notify);
 	API_FCT(native_get_gen_notify);
 	API_FCT(native_get_decoration_id);
-	API_FCT(native_register_biome);
+	API_FCT(native_serialize_schematic);
 	API_FCT(native_register_decoration);
 	API_FCT(native_register_ore);
 	API_FCT(native_register_schematic);

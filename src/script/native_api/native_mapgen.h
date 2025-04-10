@@ -49,7 +49,7 @@ public:
 	
 	struct NodeData
 	{
-		std::string *name;
+		std::string* name;
 		bool force_place;
 		u8 probability;
 		u8 param2;
@@ -108,6 +108,6 @@ public:
 	static void n_create_schematic(const NodeDefManager* ndef, Schematic& schem, const std::string& filename);
 	static void n_place_schematic(Schematic* s, ServerMap* m, const u32 flags, const v3s16 &p, const Rotation rot, const bool force_placement);
 	static bool n_place_schematic_on_vmanip(MMVManip* v, Schematic* s, const v3s16 p, const u32 flags, const Rotation rot, const bool force_placement);
-	static std::unique_ptr<std::string> n_serialize_schematic(const Schematic* s, const int fmt, const bool use_comments, const u32 indent_spaces);
+	static std::string n_serialize_schematic(const Schematic* s, const int fmt, const bool use_comments, const u32 indent_spaces);
 	static SchematicFieldData n_read_schematic(Schematic *schem, std::string &write_yslice);
 };

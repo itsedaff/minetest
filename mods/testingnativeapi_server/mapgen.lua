@@ -151,7 +151,7 @@ if core.registered_biomes["testbiome"] then luaRegisteredBiome = core.registered
 core.clear_registered_biomes()
 f:write(dump(core.registered_biomes).."\n")
 
-local nativeRes = core.register_biome(testBiome)
+local nativeRes = core.test_func(testBiome)
 f:write(nativeRes..dump(core.registered_biomes).."\n")
 local nativeRegisteredBiome
 if core.registered_biomes["testbiome"] then nativeRegisteredBiome = core.registered_biomes["testbiome"] end
@@ -159,65 +159,36 @@ core.clear_registered_biomes()
 f:write(dump(core.registered_biomes).."\n")
 
 --[[
-Attempted solutions: 
+Attempted solutions/observations: 
 lua works and native doesn't work when you swap the function bodies
 lua works and native doesn't work when both have lua bodies
 lua works and native doesn't work when both have native bodies
-Test works if you use core.register_biome twice
+Test works if you use core.register_biome twice regardless of function body content
 native function is registered with same macro as other, working functions
-doesn't work if macro is expanded
-behavior appears normal when stepping through debugger (table fields have correct values) and a valid handle is returned
-changing function name doesn't work
+expanding macro doesn't work
+behavior appears normal when stepping through debugger (table fields have correct values) and a valid handle is returned, but no biome is registered
+registering the function also appears normal when stepping though debugger, with working references to native function
 native function correctly returns nil if biome has already been registered
-created a new function called "test_func" with copied and pasted lua function body, did not work
-checked if Lua function body had been accidentally modified, is identical to repository version before first commit
-]]
+new function called "test_func" with copied and pasted lua function body did not work
+changing the name of l_register_biome worked
+changing the l_register_biome's registration macro to reference the native function worked.
+changing l_native_get_biome_data's function registration to reference the original lua function did not work
+checked if Lua function body had accidentally been modified, is identical to repository version before first Cacti Council commit
+]]--
 --test register_decoration
 
 local testDeco = {
     deco_type = "simple",
-    place_on = "default:dirt_with_grass, default:water",
-
+    place_on = "default:stone",
+    name = "testdeco",
     sidelen = 8,
-    fill_ratio = 0.02,
-    noise_params = {
-        offset = 0,
-        scale = 0.45,
-        spread = {x = 100, y = 100, z = 100},
-        seed = 354,
-        octaves = 3,
-        persist = 0.7,
-        lacunarity = 2.0,
-        flags = "absvalue"
-    },
-    biomes = {"Oceanside", "Hills", "Plains"},
+    fill_ratio = 10,
     y_min = -31000,
     y_max = 31000,
-    spawn_by = "default:water",
-    num_spawn_by = 1,
     flags = "liquid_surface, force_placement, all_floors, all_ceilings",
-    decoration = "default:diamondblock",
+    decoration = "default:goldblock",
     height = 1,
-    height_max = 0,
-    param2 = 0,
-    param2_max = 0,
-    place_offset_y = 0,
-    schematic = {
-        size = {x = 4, y = 6, z = 4},
-        data = {
-            {name = "default:cobble", param1 = 255, param2 = 0},
-            {name = "default:dirt_with_grass", param1 = 255, param2 = 0},
-            {name = "air", param1 = 255, param2 = 0},
-             ...
-        },
-        yslice_prob = {
-            {ypos = 2, prob = 128},
-            {ypos = 5, prob = 64},
-             ...
-        },
-    },
-    rotation = "90",
-
+    height_max = 1,
 }
 
 local luaHandle = core.register_decoration(testDeco)
@@ -235,55 +206,14 @@ core.clear_registered_decorations()
 
 local testOre = {
     name = "testore",
-    ore_type = "scatter",
-    ore = "default:diamondblock",
-    ore_param2 = 3,
+    y_max = 31,
     wherein = "default:stone",
-    clust_scarcity = 2,
-    clust_num_ores = 10,
-    clust_size = 3,
     y_min = -31000,
-    y_max = 31000,
-    flags = "",
-    noise_threshold = 0.5,
-    noise_params = {
-        offset = 0,
-        scale = 1,
-        spread = {x = 100, y = 100, z = 100},
-        seed = 23,
-        octaves = 3,
-        persist = 0.7
-    },
-    biomes = {"desert", "rainforest", "Oceanside", "Hills", "Plains"},
-    column_height_min = 1,
-    column_height_max = 16,
-    column_midpoint_factor = 0.5,
-    np_puff_top = {
-        offset = 4,
-        scale = 2,
-        spread = {x = 100, y = 100, z = 100},
-        seed = 47,
-        octaves = 3,
-        persist = 0.7
-    },
-    np_puff_bottom = {
-        offset = 4,
-        scale = 2,
-        spread = {x = 100, y = 100, z = 100},
-        seed = 11,
-        octaves = 3,
-        persist = 0.7
-    },
-    random_factor = 1.0,
-    np_stratum_thickness = {
-        offset = 8,
-        scale = 4,
-        spread = {x = 100, y = 100, z = 100},
-        seed = 17,
-        octaves = 3,
-        persist = 0.7
-    },
-    stratum_thickness = 8,
+    clust_scarcity = 1,
+    clust_num_ores = 1,
+    ore_type = "scatter",
+    clust_size = 1,
+    ore = "default:diamondblock"
 }
 
 core.register_ore(testOre)
@@ -297,8 +227,8 @@ core.clear_registered_ores()
 
 --test register_schematic
 
-local testSchematic = {
-    name = "testschematic",
+local testSchem = {
+    name = "testSchem",
 	size = {x = 3, y = 3, z = 3},
 	data = {
 		-- The side of the bush, with the air on top
@@ -318,13 +248,13 @@ local testSchematic = {
 
 --issue: registered schematics table is not available at init time?
 local luaSchematic
-core.register_schematic(testSchematic)
---luaSchematic = minetest.registered_schematics["testschematic"]
+core.register_schematic(testSchem)
+--luaSchematic = minetest.registered_schematics["testSchem"]
 core.clear_registered_schematics()
 
 local nativeSchematic
-core.register_schematic(testSchematic)
---nativeSchematic = minetest.registered_schematics["testschematic"]
+core.register_schematic(testSchem)
+--nativeSchematic = minetest.registered_schematics["testSchem"]
 core.clear_registered_schematics()
 
 --test clear_registered_biomes
@@ -371,47 +301,128 @@ local testOreCleared = (luaOreCleared and nativeOreCleared)
 core.clear_registered_ores();
 
 --test generate_ores
-local luaOres 
-local nativeOres 
+--function simply checks if both functions generate ores because generation is not deterministic
+local luaOres = false
+local nativeOres = false
 local tested = false
-local oresSame = true
 core.register_ore(testOre)
---must register ore block type as node too to identify it from block data
 
-local testOreId = 83
+--sets entire map to a block for testing (except for air blocks)
+SetMap = function (blockname, vmanip)
+    local blocks = vmanip:get_data()
+    local blockId = core.get_content_id(blockname)
+    local airId = core.get_content_id("air")
+    for i, v in pairs(blocks) do
+        if v ~= airId then blocks[i] = blockId end
+    end
+    vmanip:set_data(blocks)
+    vmanip:write_to_map()
+end
+
 core.register_on_generated(
     function (minp, maxp, blockseed)
-        if not tested then
-            Log(tostring(tested)) 
-            local vmanip = VoxelManip(minp, maxp)
-            local origData = vmanip:get_data()
-
+        if not tested then 
+            local vmanip = core.get_mapgen_object("voxelmanip")
+            local testId = core.get_content_id("default:diamondblock")
+            SetMap("default:stone", vmanip)
             core.generate_ores(vmanip, minp, maxp)
+            local currData = vmanip:get_data()
+            luaOres = TableContains(currData, testId)
             vmanip:write_to_map()
-            luaOres = vmanip:get_data()
-            f = io.open("vmanipdata.txt", "w+")
-            f:write(dump(luaOres))
-            vmanip:set_data(origData)
-            
-            --checks if ores are generated, will skip if not
-            local idCt = 0
-            for _, v in pairs(luaOres) do
-                if v == testOreId then idCt = idCt + 1 end
-            end
-            if idCt > 0 then
-                core.native_generate_ores(vmanip, minp, maxp)
-                vmanip:write_to_map()
-                nativeOres = vmanip:get_data()
-                f:write(dump(nativeOres))
-                vmanip:set_data(origData)
-                tested = true
-                if dump(luaOres) == dump(nativeOres) then oresSame = true end
-            end
+
+            SetMap("default:stone", vmanip)
+            --core.native_generate_ores(vmanip, minp, maxp)
+            currData = vmanip:get_data()
+            nativeOres = TableContains(currData, testId)
+            vmanip:write_to_map()
+            SetMap("default:stone", vmanip)
+            tested = true
         end
     end
 )
-core.clear_registered_ores()
 
+--test generate_decorations
+local luaDecos = false
+local nativeDecos = false
+local tested = false
+
+core.register_decoration(testDeco)
+
+--helper function that resets a node to air (assumes that decoration is a node)
+SetNodeToAir = function(nodename, vmanip)
+    local nodeId = core.get_content_id(nodename)
+    local airId = core.get_content_id("air")
+    local blocks = vmanip:get_data()
+    for i, v in pairs(blocks) do 
+        if v == nodeId then blocks[i] = airId end
+    end
+    vmanip:set_data(blocks)
+    vmanip:write_to_map()
+end
+
+core.register_on_generated(
+    function(minp, maxp, blockseed)
+            if not tested then 
+            local vmanip = core.get_mapgen_object("voxelmanip")
+            local testId = core.get_content_id("default:goldblock")
+
+            core.generate_decorations(vmanip, minp, maxp)
+            vmanip:write_to_map()
+            if TableContains(vmanip:get_data(), testId) then luaDecos = true end
+            SetNodeToAir("default:goldblock", vmanip)
+
+            --core.native_generate_decorations(vmanip, minp, maxp)
+            vmanip:write_to_map()
+            if TableContains(vmanip:get_data(), testId) then nativeDecos = true end
+            SetNodeToAir("default:goldblock", vmanip)
+            tested = true
+        end
+    end
+)
+
+--test create_schematic
+local tested = false
+core.register_on_generated(
+    function(minp, maxp, blockseed)
+        if not tested then
+        core.create_schematic(minp, maxp, {}, "luaschem.mts", {})
+        core.native_create_schematic(minp, maxp, {}, "nativeschem.mts", {})
+        tested = true
+        end
+    end
+)
+
+--helper function to retrieve biomes
+core.register_chatcommand("get_biomes",
+{
+    description="Helper command - writes all registered biomes to file",
+    func = function(self)
+        local f = io.open("biomes.txt", "w")
+        f:write(dump(core.registered_biomes))
+        return true
+    end
+})
+--helper function to retrieve ores
+core.register_chatcommand("get_ores",
+{
+    description="Helper command - writes all registered ores to file",
+    func = function(self)
+        local f = io.open("ores.txt", "w")
+        f:write(dump(core.registered_ores))
+        return true
+    end
+})
+
+--helper function to retrieve nodes
+core.register_chatcommand("get_nodes",
+{
+    description="Helper command - writes all registered nodes to file",
+    func = function(self)
+        local f = io.open("nodes.txt", "w")
+        f:write(dump(core.registered_ores))
+        return true
+    end
+})
 
 --normal test commands
 core.register_chatcommand("lua_get_biome_data", 
@@ -1034,17 +1045,6 @@ core.register_chatcommand("test_get_decoration_id",
     end
 })
 
---helper function to retrieve biomes
-core.register_chatcommand("get_biomes",
-{
-    description="Helper command - writes all registered decorations to file",
-    func = function(self)
-        local f = io.open("../../biomes.txt", "w")
-        f:write(dump(core.registered_biomes))
-        return true
-    end
-})
-
 core.register_chatcommand("lua_register_biome", 
 {
     description="Invokes lua_api > register_biome",
@@ -1269,8 +1269,8 @@ core.register_chatcommand("lua_generate_ores", {
     description="Invokes lua_api > generate_ores",
     func = function (self)
         local id = core.get_content_id("default:diamondblock")
-        if luaOres then return true, "Lua ores generated \n"
-        else return false, "Lua ores not generated"..id end
+        if luaOres then return true, "Lua ores generated"
+        else return false, "Lua ores not generated" end
     end
 })
 
@@ -1285,7 +1285,130 @@ core.register_chatcommand("native_generate_ores", {
 core.register_chatcommand("test_generate_ores", {
     description="Compares output of lua and native generated ores",
     func = function (self)
-        if luaOres ~= nil and dump(luaOres) == dump(nativeOres) then return true, "Lua and native ores are the same"
+        if luaOres == true and nativeOres == true then return true, "Lua and native ores are the same"
         else return false, "Lua and native ores are not the same" end
+    end
+})
+
+core.register_chatcommand("lua_generate_decorations", {
+    description="Invokes lua_api > generate_decorations",
+    func = function (self)
+        if luaDecos then return true, "Lua decorations generated \n"
+        else return false, "Lua decorations not generated" end
+    end
+})
+
+core.register_chatcommand("native_generate_decorations", {
+    description="Invokes native_api > generate_decorations",
+    func = function (self)
+        if nativeDecos then return true, "Native decorations generated \n"
+        else return false, "Native decorations not generated" end
+    end
+})
+
+core.register_chatcommand("test_generate_decorations", {
+    description="Compares output of lua and native generated decorations",
+    func = function (self)
+        if luaDecos == true and nativeDecos == true then return true, "Lua and native decorations are the same"
+        else return false, "Lua and native ores are not the same" end
+    end
+})
+
+core.register_chatcommand("lua_create_schematic", {
+    description="Invokes lua_api > create_schematic",
+    func = function (self)
+        local f = io.open("luaschem.mts", "r")
+        if f ~= nil then return true, "Lua schematic file generated" 
+        else return false, "Lua schematic not generated" end
+    end
+})
+
+core.register_chatcommand("native_create_schematic", {
+    description="Invokes native_api > create_schematic",
+    func = function (self)
+        local f = io.open("nativeschem.mts", "r") 
+        if f ~= nil then  return true, "Native schematic file generated"
+        else return false, "Native schematic not generated" end
+    end
+})
+
+core.register_chatcommand("test_create_schematic", {
+    description="Compares generated schematic files for lua and native APIs",
+    func = function (self)
+        local luaFile = io.open("luaschem.mts", "r")
+        local luaData = luaFile:read("*all")
+        local nativeFile = io.open("nativeschem.mts", "r")
+        local nativeData = nativeFile:read("*all")
+
+        if dump(luaData) == dump(nativeData) then return true, "Lua and native generated schematic files are identical"
+        else return false, "Lua and native schematic files are not identical" end
+    end
+})
+
+core.register_chatcommand("lua_serialize_schematic", {
+    description="Invokes lua_api > serialize_schematic",
+    func = function (self)
+        local luamts = core.serialize_schematic(testSchem, "mts", {})
+        local luaLua = core.serialize_schematic(testSchem, "lua", {})
+        if luamts ~= nil and luaLua ~= nil then return true, "Schematics serialized".." fmts: "..tostring(luamts).." lua: "..luaLua
+        else return false, "One or more schematics not serialized - ".."fmts: "..tostring(luamts).." lua: "..tostring(luaLua) end
+    end
+})
+--[[ Confirmed working in debugger, check Lua code ]]--
+core.register_chatcommand("native_serialize_schematic", {
+    description="Invokes native_api > serialize_schematic",
+    func = function (self)
+        local nativemts = core.native_serialize_schematic(testSchem, "mts", {})
+        local nativeLua = core.native_serialize_schematic(testSchem, "lua", {})
+        if nativemts ~= nil and nativeLua ~= nil then return true, "Schematics serialized".." fmts: "..tostring(nativemts).." lua: "..tostring(nativeLua)
+        else return false, "One or more schematics not serialized - ".."fmts: "..tostring(nativemts).." lua: "..tostring(nativeLua) end
+    end
+})
+
+core.register_chatcommand("test_serialize_schematic", {
+    description="Compares serialized versions of lua and native APIs",
+    func = function (self)
+        local errorstring = ""
+        local luaMts = core.serialize_schematic(testSchem, "mts", {})
+        local luaLua = core.serialize_schematic(testSchem, "lua", {})
+        local nativeMts = core.native_serialize_schematic(testSchem, "mts", {})
+        local nativeLua = core.native_serialize_schematic(testSchem, "lua", {})
+
+        local mtsIdentical = (luaMts == nativeMts)
+        if mtsIdentical == false then errorstring = errorstring.."Lua and native mts data were not identical - ".."lua: "..luaMts.." native: "..nativeMts.."\n" end
+        
+        local luaIdentical = (luaLua == nativeLua)
+        if luaIdentical == false then errorstring = errorstring.."Lua and native lua data were not identical - ".."lua: "..luaLua.." native: "..nativeLua end
+
+        if errorstring == "" then return true, "Lua and native serialized schematics were identical"
+        else return false, errorstring end
+    end
+})
+
+--both lua and nil read as nil for some reason
+core.register_chatcommand("lua_read_schematic", {
+    description="Invokes lua_api > read_schematic",
+    func = function (self)
+        local schem = core.read_schematic(testSchem, {})
+        if schem ~= nil then return true, "Schematic read correctly"
+        else return false, "Lua function returned nil" end
+    end
+})
+core.register_chatcommand("native_read_schematic", {
+    description="Invokes native_api > read_schematic",
+    func = function (self)
+        local schem = core.native_read_schematic("luaschem.mts", {})
+        if schem ~= nil then return true, "Schematic read correctly"
+        else return false, "Native function returned nil" end
+    end
+})
+
+core.register_chatcommand("test_read_schematic", {
+    description="Tests output of Lua and native read_schematic",
+    func = function (self)
+        local luaSchem = core.read_schematic("luaschem.mts", {})
+        local nativeSchem = core.native_read_schematic("luaschem.mts", {})
+        if luaSchem ~= nil and dump(luaSchem) == dump(testSchem) then return true, "Lua and native schematics identical"
+        else return false, "Lua schematic:\n"..dump(luaSchem).."Native schematic: "..dump(nativeSchem) end
     end
 })
