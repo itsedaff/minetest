@@ -1397,7 +1397,7 @@ core.register_chatcommand("lua_read_schematic", {
 core.register_chatcommand("native_read_schematic", {
     description="Invokes native_api > read_schematic",
     func = function (self)
-        local schem = core.native_read_schematic("luaschem.mts", {})
+        local schem = core.native_read_schematic(testSchem, {})
         if schem ~= nil then return true, "Schematic read correctly"
         else return false, "Native function returned nil" end
     end
