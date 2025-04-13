@@ -1,3 +1,7 @@
+local modpath = core.get_modpath("testingnativeapi_server")
+InitEnvVars = assert(loadfile(modpath.."/env.lua", "t"))
+InitEnvVars()
+
 --Gets name of current player and lets you change it by sending a chat message - needed for tests
 local playerName = "singleplayer"
 core.register_on_chat_message(function(name, message)
@@ -472,13 +476,441 @@ core.register_chatcommand("test_unban_player_or_ip", {
 
 local testFormspec = {
     "formspec_version[4]",
+    "size[2,2]",
+    "position[0,0.5]",
+    "anchor[0,0.5]",
     "button[1.5,2.3;3,0.8;cringe;Cringe]"
 }
 
 core.register_chatcommand("lua_show_formspec", {
     description="Invokes lua_api > show_formspec",
-    function (self)
-        core.show_formspec(playerName, "lua:formspec", table.concat(testFormspec, ""))
-        return true, "Lua formspec shown"
+    func = function (self)
+        local status = core.show_formspec(playerName, "testingnativeapi_server:luaformspec", table.concat(testFormspec, ""))
+        core.close_formspec(playerName, "testingnativeapi_server:luaformspec")        
+        if status == true then return true, "Formspec shown"
+        else return false, "Formspec not shown" end
+    end
+})
+
+core.register_chatcommand("native_show_formspec", {
+    description="Invokes native_api > show_formspec",
+    func = function (self)
+        local status = core.native_show_formspec(playerName, "testingnativeapi_server:nativeformspec", table.concat(testFormspec, ""))
+        core.close_formspec(playerName, "testingnativeapi_server:nativeformspec")        
+        if status == true then return true, "Formspec shown"
+        else return false, "Formspec not shown" end
+    end
+})
+
+core.register_chatcommand("test_show_formspec", {
+    description="Compares output of lua and native show_formspecs",
+    func = function()
+        local luaStatus = core.show_formspec(playerName, "testingnativeapi_server:luaformspec", table.concat(testFormspec, ""))
+        core.close_formspec(playerName, "testingnativeapi_server:luaformspec")
+        
+        local nativeStatus = core.native_show_formspec(playerName, "testingnativeapi_server:nativeformspec", table.concat(testFormspec, ""))
+        core.close_formspec(playerName, "testingnativeapi_server:nativeformspec")
+
+        if luaStatus and nativeStatus then return true, "Both Lua and native formspecs shown"
+        else return false, "Lua formspec shown: "..tostring(luaStatus).." Native formspec shown: "..tostring(nativeStatus) end
+    end
+})
+
+--command only works during load time
+local luaModname = core.get_current_modname()
+local nativeModname = core.native_get_current_modname()
+core.register_chatcommand("lua_get_current_modname", {
+    description="Invokes lua_api > get_current_modname",
+    func=function ()
+        if luaModname then return true, "Mod name returned"
+        else return false, "Mod name has not been returned" end
+    end
+})
+
+core.register_chatcommand("native_get_current_modname", {
+    description="Invokes native_api > get_current_modname",
+    func=function ()
+        if nativeModname then return true, "Mod name returned"
+        else return false, "Mod name has not been returned" end
+        end
+})
+
+core.register_chatcommand("test_get_current_modname", {
+    description="Tests output of Lua and native get_current_modname",
+    func = function ()
+        if luaModname ~= nil and luaModname == nativeModname then return true, "Mod names identical"
+        else return false, "Lua modname: "..tostring(luaModname).." Native modname: "..tostring(nativeModname) end
+    end
+})
+
+core.register_chatcommand("lua_get_modpath", {
+    description="Invokes lua_api > get_modpath",
+    func = function()
+        local path = core.get_modpath("default")
+        if path then return true, "Path returned" 
+        else return false, "Path not returned" end
+    end
+})
+
+core.register_chatcommand("native_get_modpath", {
+    description="Invokes native_api > get_modpath",
+    func = function()
+        local path = core.native_get_modpath("default")
+        if path then return true, "Path returned" 
+        else return false, "Path not returned" end
+    end
+})
+
+core.register_chatcommand("test_get_modpath", {
+    description="Tests output of lua and native get_modpath functions",
+    func = function ()
+        local luaPath = core.get_modpath("default")
+        local nativePath = core.native_get_modpath("default")
+        if luaPath ~= nil and luaPath == nativePath then return true, "Lua and native modpaths identical"
+        else return false, "Lua and native modpaths not identical" end
+    end
+})
+
+core.register_chatcommand("lua_get_modnames", {
+    description="Invokes lua_api > get_modnames",
+    func = function ()
+        local modnames = core.get_modnames()
+        if modnames then return true, "Returned modnames: \n"..dump(modnames)
+        else return false, "Modnames not returned" end
+    end
+})
+
+core.register_chatcommand("native_get_modnames", {
+    description="Invokes native_api > get_modnames",
+    func = function ()
+        local modnames = core.native_get_modnames()
+        if modnames then return true, "Returned modnames: \n"..dump(modnames)
+        else return false, "Modnames not returned" end
+    end
+})
+
+core.register_chatcommand("test_get_modnames", {
+    description="Compares output of lua and native get_modnames",
+    func = function ()
+        local luaModnames = core.get_modnames()
+        local nativeModnames = core.native_get_modnames()
+        if dump(luaModnames) == dump(nativeModnames) then return true, "Lua and native modnames identical"
+        else return false, "Lua and native modnames not identical"..dump(luaModnames)..dump(nativeModnames) end
+    end
+})
+
+core.register_chatcommand("lua_get_worldpath", {
+    description="Invokes lua_api > get_worldpath",
+    func = function ()
+        local path = core.get_worldpath()
+        if path then return true, "Path returned: "..path
+        else return false, "Function returned nil" end
+    end
+})
+
+core.register_chatcommand("native_get_worldpath", {
+    description="Invokes native_api > get_worldpath",
+    func = function ()
+        local path = core.native_get_worldpath()
+        if path then return true, "Path returned: "..path
+        else return false, "Function returned nil" end
+    end
+})
+
+core.register_chatcommand("test_get_worldpath", {
+    description="Compares function outputs for lua and native get_worldpath",
+    func = function ()
+        local luaPath = core.get_worldpath()
+        local nativePath = core.native_get_worldpath()
+
+        if luaPath ~= nil and luaPath == nativePath then return true, "Lua and native paths are identical"
+        else return false, "Lua path: "..tostring(luaPath).." Native path: "..tostring(nativePath) end
+    end
+})
+
+core.register_chatcommand("lua_sound_play", {
+    description="Invokes lua_api > sound_play",
+    func = function ()
+        local sound = core.sound_play({name = "default_place_node"})
+        core.sound_stop(sound)
+        if sound then return true, "Sound was played" end
+    end
+})
+
+core.register_chatcommand("native_sound_play", {
+    description="Invokes native_api > sound_play",
+    func = function ()
+        local sound = core.native_sound_play({name = "default_place_node"})
+        core.sound_stop(sound)
+        if sound then return true, "Sound was played" end
+    end
+})
+
+core.register_chatcommand("test_sound_play", {
+    description="Invokes sound_play in both lua and native APIs",
+    func = function ()
+        local luaSound = core.sound_play({name = "default_place_node"})
+        core.sound_stop(luaSound)
+
+        local nativeSound = core.native_sound_play({name = "default_place_node"})
+        core.sound_stop(nativeSound)
+
+        if luaSound and nativeSound then return true, "Lua and native sounds were played"
+        else return false, "Lua sound handle: "..tostring(luaSound).." Native sound handle: "..tostring(nativeSound) end
+    end
+})
+
+--must confirm with headphones because API doesn't provide real time audio data
+function Sleep (time) 
+    local sec = tonumber(os.clock() + time); 
+    while (os.clock() < sec) do 
+    end 
+end
+
+core.register_chatcommand("lua_sound_stop", {
+    description="Invokes lua_api > sound_stop",
+    func = function ()
+        local sound = core.sound_play("default_place_node", {to_player=playerName, gain=2.0, pitch=1.0, loop=true})
+        Sleep(4)
+        core.sound_stop(sound)
+        return true, "If you can no longer hear the sound, the test has passed"
+    end
+})
+
+core.register_chatcommand("native_sound_stop", {
+    description="Invokes lua_api > sound_stop",
+    func = function ()
+        local sound = core.sound_play("default_place_node", {to_player=playerName, gain=2.0, pitch=1.0, loop=true})
+        Sleep(4)
+        core.native_sound_stop(sound)
+        return true, "If you can no longer hear the sound, the test has passed"
+    end
+})
+
+core.register_chatcommand("test_sound_stop", {
+    description="Plays sound and stops it with lua and native API sound_stop functions",
+    func = function ()
+        local luaSound = core.sound_play("default_break_glass", {to_player=playerName, gain=2.0, pitch=1.0, loop=true})
+        Sleep(4)
+        core.sound_stop(luaSound)
+        core.chat_send_all("If you can no longer hear the sound, Lua test has passed")
+        Sleep(1)
+        local nativeSound = core.sound_play("default_break_glass", {to_player=playerName, gain=2.0, pitch=1.0, loop=true})
+        Sleep(4)
+        core.native_sound_stop(nativeSound)
+        core.chat_send_all("If you can no longer hear the sound, native test has passed")
+        return true
+    end
+})
+
+core.register_chatcommand("lua_sound_fade", {
+    description="Invokes lua_api > sound_fade",
+    func=function ()
+        local sound = core.sound_play("default_place_node", {to_player=playerName, gain=3.0, pitch=1.0, loop=true})
+        core.sound_fade(sound, 1 ,0)
+        Sleep(3.1)
+        return true, "If you heard the sound fade out over three seconds, the test has passed"
+    end
+})
+
+core.register_chatcommand("native_sound_fade", {
+    description="Invokes lua_api > sound_fade",
+    func=function ()
+        local sound = core.sound_play("default_place_node", {to_player=playerName, gain=3.0, pitch=1.0, loop=true})
+        core.native_sound_fade(sound, 1 ,0)
+        Sleep(3.1)
+        return true, "If you heard the sound fade out over three seconds, the test has passed"
+    end
+})
+
+core.register_chatcommand("test_sound_fade", {
+    description="Invokes test_sound_fade for both Lua and native APIs",
+    func=function ()
+        local sound = core.sound_play("default_place_node", {to_player=playerName, gain=3.0, pitch=1.0, loop=true})
+        core.sound_fade(sound, 1 ,0)
+        Sleep(3.1)
+        core.chat_send_all("If you heard the sound fade out over three seconds, the lua test has passed")
+
+        local sound = core.sound_play("default_place_node", {to_player=playerName, gain=3.0, pitch=1.0, loop=true})
+        core.native_sound_fade(sound, 1 ,0)
+        Sleep(3.1)
+        core.chat_send_all("If you heard the sound fade out over three seconds, the native test has passed")
+        return true
+    end
+})
+
+--Callback that does nothing required by dynamic_add_media
+Callback = function (name)
+end
+
+local luaMediaAdded = false
+local nativeMediaAdded = false
+
+AddLuaMedia = function ()
+    local status = core.dynamic_add_media(LuaMediaPath, Callback)
+    luaMediaAdded = (luaMediaAdded or status)
+    if status then return true, "Media was added"
+    else return false, "Media was not added" end
+end
+
+AddNativeMedia = function ()
+    local status = core.dynamic_add_media(NativeMediaPath, Callback)
+    nativeMediaAdded = (luaMediaAdded or status)
+    if status then return true, "Media was added"
+    else return false, "Media was not added" end
+end
+
+--image path must be OUTSIDE of any minetest directory to work
+--must restart between tests because there is no way to unload media from cache while game is running (automate later)?
+core.register_chatcommand("lua_dynamic_add_media", {
+    description="Invokes lua_api > dynamic_add_media",
+    func = function ()
+        local status, statusString = AddLuaMedia()
+        return status, statusString
+    end
+})
+
+core.register_chatcommand("native_dynamic_add_media", {
+    description="Invokes native_api > dynamic_add_media",
+    func = function ()
+        local status, statusString = AddNativeMedia()
+        return status, statusString;
+    end
+})
+
+core.register_chatcommand("test_dynamic_add_media", {
+    description="Compares output of lua and native dynamic_add_media",
+    func = function ()
+        AddLuaMedia()
+        AddNativeMedia()
+        if luaMediaAdded and nativeMediaAdded then return true, "Lua and native media were added"
+        else return false, "Lua media added: "..tostring(luaMediaAdded).. " Native media added: "..tostring(nativeMediaAdded) end
+    end
+})
+
+core.register_chatcommand("lua_is_singleplayer", {
+    description="Invokes lua_api > is_singleplayer",
+    func = function ()
+        local isSP = core.is_singleplayer()
+        if isSP then return true, "Is singleplayer: "..tostring(isSP)
+        else return false, "Function did not return value." end
+    end
+})
+
+core.register_chatcommand("native_is_singleplayer", {
+    description="Invokes native_api > is_singleplayer",
+    func = function ()
+        local isSP = core.native_is_singleplayer()
+        if isSP then return true, "Is singleplayer: "..tostring(isSP)
+        else return false, "Function did not return value." end
+    end
+})
+
+core.register_chatcommand("test_is_singleplayer", {
+    description="Compares output of Lua and native is_singeplayer functions",
+    func = function ()
+        local luaSP = core.is_singleplayer()
+        local nativeSP = core.native_is_singleplayer()
+        if luaSP ~= nil and luaSP == nativeSP then return true, "Lua and native outputs identical"
+        else return false, "Lua output: "..tostring(luaSP).." Native output: "..tostring(nativeSP) end
+    end
+})
+
+
+--swaps out privilege data file for another one and checks if changes apply
+local worldPath = core.get_worldpath()
+local authPath = worldPath.."/auth.sqlite"
+
+core.register_chatcommand("lua_notify_authentication_modified", {
+    description="Invokes lua_api > notify_authentication_modified",
+    func=function ()
+        --must read and overwrite files because os.rename doesn't work
+        local openTestDb = io.open(AuthTablePath, "r")
+        local openInitDb = io.open(authPath, "r")
+        local testDb = openTestDb:read("*all")
+        local oldDb = openInitDb:read("*all")
+
+        local initPrivs = core.get_player_privs(playerName)
+        os.remove(authPath)
+        openInitDb:write(testDb)
+        core.notify_authentication_modified(playerName)
+        local privs = core.get_player_privs(playerName)
+        os.remove(authPath)
+        openInitDb:write(oldDb)
+        core.notify_authentication_modified(playerName)
+        return true, dump(initPrivs)..dump(privs)
+    end
+})
+
+core.register_chatcommand("lua_get_last_run_mod", {
+    description="Invokes lua_api > get_last_run_mod",
+    func = function ()
+        local mod = core.get_last_run_mod()
+        if mod then return true, "Last run mod: "..tostring(mod)
+        else return false, "Function returned nil" end
+    end
+})
+
+core.register_chatcommand("native_get_last_run_mod", {
+    description="Invokes native_api > get_last_run_mod", 
+    func=function ()
+        local mod = core.native_get_last_run_mod()
+        if mod then return true, "Last run mod: "..tostring(mod)
+        else return false, "Function returned nil" end
+    end
+})
+
+core.register_chatcommand("test_get_last_run_mod", {
+    description="Compares output of Lua and native get_last_run_mod",
+    func = function ()
+        local luaMod = core.get_last_run_mod()
+        local nativeMod = core.native_get_last_run_mod()
+
+        if luaMod ~= nil and luaMod == nativeMod then return true, "Lua and native function outputs identical"
+        else return "Lua output: "..tostring(luaMod).." Native output: "..tostring(nativeMod) end
+    end
+})
+
+core.register_chatcommand("lua_set_last_run_mod", {
+    description="Invokes lua_api > set_last_run_mod",
+    func = function ()
+        local origMod = core.get_last_run_mod()
+        core.set_last_run_mod("default")
+        local newMod = core.get_last_run_mod()
+        core.set_last_run_mod(origMod)
+
+        if (origMod ~= nil and newMod ~= nil) and origMod ~= newMod then return true, "Last run mod set succesfully"
+        else return false, "Last run mod set unsuccessfully to: "..tostring(newMod) end
+    end
+})
+
+core.register_chatcommand("native_set_last_run_mod", {
+    description="Invokes native_api > set_last_run_mod",
+    func = function ()
+        local origMod = core.get_last_run_mod()
+        core.native_set_last_run_mod("default")
+        local newMod = core.get_last_run_mod()
+        core.set_last_run_mod(origMod)
+
+        if (origMod ~= nil and newMod ~= nil) and origMod ~= newMod then return true, "Last run mod set succesfully"
+        else return false, "Last run mod set unsuccessfully to: "..tostring(newMod) end
+    end
+})
+
+core.register_chatcommand("test_set_last_run_mod", {
+    description="Compares output of lua and native set_last_run_mod",
+    func = function ()
+        local origMod = core.get_last_run_mod()
+
+        core.set_last_run_mod("default")
+        local luaMod = core.get_last_run_mod()
+        core.set_last_run_mod(origMod)
+
+        core.native_set_last_run_mod("default")
+        local nativeMod = core.get_last_run_mod()
+        core.set_last_run_mod(origMod)
+
+        if luaMod ~= nil and luaMod == nativeMod then return true, "Lua and native mods set last run mod to same value"
+        else return false, "Lua mod: "..tostring(luaMod).." Native mod: "..tostring(nativeMod) end
     end
 })

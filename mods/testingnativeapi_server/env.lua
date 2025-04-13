@@ -1,4 +1,8 @@
 Path = "C:\\minetest\\worlds\\mapgentest\\map.sqlite"
+LuaMediaPath = "C:\\Users\\ellio\\Downloads\\luatestimage.png"
+NativeMediaPath = "C:\\Users\\ellio\\Downloads\\nativetestimage.png"
+MediaCachePath = "C:\\minetest\\cache\\media\\"
+AuthTablePath = "C:\\minetest\\clientmods\\testingnativeapi_client\\textures\\auth.sqlite"
 
 CompareTables = function (table1, table2)
     local identical = true
