@@ -4,6 +4,11 @@ InitEnvVars()
 
 --Gets name of current player and lets you change it by sending a chat message - needed for tests
 local playerName = "singleplayer"
+
+core.register_on_joinplayer(function(player)
+    playerName = player:get_player_name()
+end)
+
 core.register_on_chat_message(function(name, message)
     playerName = name
     core.chat_send_player(name, "Test player name changed to: ".. name)
@@ -816,32 +821,235 @@ core.register_chatcommand("test_is_singleplayer", {
     end
 })
 
+--[[
+register custom auth handler to call notify_authentication_modified
+boilerplate handler code from : minetest/builtin/game/auth.lua
+]]--
 
---swaps out privilege data file for another one and checks if changes apply
-local worldPath = core.get_worldpath()
-local authPath = worldPath.."/auth.sqlite"
+local core_auth = core.auth
+core.register_authentication_handler({
+	get_auth = function(name)
+		assert(type(name) == "string")        
+		local auth_entry = core_auth.read(name)
+		-- If no such auth found, return nil
+		if not auth_entry then
+			return nil
+		end
+		-- Figure out what privileges the player should have.
+		-- Take a copy of the privilege table
+		local privileges = {}
+		for priv, _ in pairs(auth_entry.privileges) do
+			privileges[priv] = true
+		end
+		-- If singleplayer, give all privileges except those marked as give_to_singleplayer = false
+		if core.is_singleplayer() then
+			for priv, def in pairs(core.registered_privileges) do
+				if def.give_to_singleplayer then
+					privileges[priv] = true
+				end
+			end
+		-- For the admin, give everything
+		elseif name == core.settings:get("name") then
+			for priv, def in pairs(core.registered_privileges) do
+				if def.give_to_admin then
+					privileges[priv] = true
+				end
+			end
+		end
+		-- All done
+		return {
+			password = auth_entry.password,
+			privileges = privileges,
+			last_login = auth_entry.last_login,
+		}
+	end,
+	create_auth = function(name, password)
+		assert(type(name) == "string")
+		assert(type(password) == "string")
+		core.log('info', "Custom authentication handler adding player '"..name.."'")
+
+		return core_auth.create({
+			name = name,
+			password = password,
+			privileges = core.string_to_privs(core.settings:get("default_privs")),
+			last_login = -1,  -- Defer login time calculation until record_login (called by on_joinplayer)
+		})
+	end,
+	delete_auth = function(name)
+		assert(type(name) == "string")
+		local auth_entry = core_auth.read(name)
+		if not auth_entry then
+			return false
+		end
+		core.log('info', "Custom authentication handler deleting player '"..name.."'")
+		return core_auth.delete(name)
+	end,
+	set_password = function(name, password)
+		assert(type(name) == "string")
+		assert(type(password) == "string")
+		local auth_entry = core_auth.read(name)
+		if not auth_entry then
+			core.builtin_auth_handler.create_auth(name, password)
+		else
+			core.log('info', "Custom authentication handler setting password of player '"..name.."'")
+			auth_entry.password = password
+			core_auth.save(auth_entry)
+		end
+		return true
+	end,
+	set_privileges = function(name, privileges, isLua)
+		assert(type(name) == "string")
+		assert(type(privileges) == "table")
+		local auth_entry = core_auth.read(name)
+		if not auth_entry then
+			auth_entry = core.builtin_auth_handler.create_auth(name,
+				core.get_password_hash(name,
+					core.settings:get("default_password")))
+		end
+
+		-- Run grant callbacks
+		for priv, _ in pairs(privileges) do
+			if not auth_entry.privileges[priv] then
+				core.run_priv_callbacks(name, priv, nil, "grant")
+			end
+		end
+
+		-- Run revoke callbacks
+		for priv, _ in pairs(auth_entry.privileges) do
+			if not privileges[priv] then
+				core.run_priv_callbacks(name, priv, nil, "revoke")
+			end
+		end
+
+		auth_entry.privileges = privileges
+		core_auth.save(auth_entry)
+        
+        --choose notification method based on whether caller was Lua test function or not
+        if isLua then core.notify_authentication_modified("mockplayer")
+        else core.native_notify_authentication_modified("mockplayer") end
+	end,
+	reload = function()
+		core_auth.reload()
+		return true
+	end,
+	record_login = function(name)
+		assert(type(name) == "string")
+		local auth_entry = core_auth.read(name)
+		assert(auth_entry)
+		auth_entry.last_login = os.time()
+		core_auth.save(auth_entry)
+	end,
+	iterate = function()
+		local names = {}
+		local nameslist = core_auth.list_names()
+		for k,v in pairs(nameslist) do
+			names[v] = true
+		end
+		return pairs(names)
+	end,
+})
+
+core.register_on_prejoinplayer(function(name, ip)
+	if core.registered_auth_handler ~= nil then
+		return -- Don't do anything if custom auth handler registered
+	end
+	local auth_entry = core_auth.read(name)
+	if auth_entry ~= nil then
+		return
+	end
+
+	local name_lower = name:lower()
+	for k in core.builtin_auth_handler.iterate() do
+		if k:lower() == name_lower then
+			return string.format("\nCannot create new player called '%s'. "..
+					"Another account called '%s' is already registered. "..
+					"Please check the spelling if it's your account "..
+					"or use a different nickname.", name, k)
+		end
+	end
+end)
+
+
+--must create "mockplayer" auth because you can't remove your own privileges
+local authHandler = core.get_auth_handler()
+core.register_chatcommand("get_auth_info", {
+    description="Helper function that returns all authentication data",
+    func=function ()
+        return true, dump(authHandler.get_auth("mockplayer"))
+    end
+})
+
+local testPrivs = {
+    interact=nil,
+    shout=nil,
+    basic_privs=nil,
+    privs=nil,
+}
 
 core.register_chatcommand("lua_notify_authentication_modified", {
     description="Invokes lua_api > notify_authentication_modified",
     func=function ()
-        --must read and overwrite files because os.rename doesn't work
-        local openTestDb = io.open(AuthTablePath, "r")
-        local openInitDb = io.open(authPath, "r")
-        local testDb = openTestDb:read("*all")
-        local oldDb = openInitDb:read("*all")
+        --called when privs are changed through auth handler, test update notif by getting them through core privileges table
+        authHandler.delete_auth("mockplayer")
+        authHandler.create_auth("mockplayer", "asdfjkl;")
 
-        local initPrivs = core.get_player_privs(playerName)
-        os.remove(authPath)
-        openInitDb:write(testDb)
-        core.notify_authentication_modified(playerName)
-        local privs = core.get_player_privs(playerName)
-        os.remove(authPath)
-        openInitDb:write(oldDb)
-        core.notify_authentication_modified(playerName)
-        return true, dump(initPrivs)..dump(privs)
+        local initPrivs = core.get_player_privs("mockplayer")
+        authHandler.set_privileges("mockplayer", testPrivs, true)
+        local luaPrivs = core.registered_privileges["mockplayer"]
+        authHandler.set_privileges("mockplayer", initPrivs, true)
+
+        authHandler.delete_auth("mockplayer")
+        if dump(initPrivs) ~= dump(luaPrivs) then return true, "Engine notified of auth change"
+        else return false, "Engine not notified of auth change" end
     end
 })
 
+
+core.register_chatcommand("native_notify_authentication_modified", {
+    description="Invokes native_api > notify_authentication_modified",
+    func=function ()
+        --called when privs are changed through auth handler, test update notif by getting them through core privileges table
+        authHandler.delete_auth("mockplayer")
+        authHandler.create_auth("mockplayer", "asdfjkl;")
+
+        local initPrivs = core.get_player_privs("mockplayer")
+        authHandler.set_privileges("mockplayer", testPrivs, false)
+        local nativePrivs = core.registered_privileges["mockplayer"]
+        authHandler.set_privileges("mockplayer", initPrivs, false)
+
+        authHandler.delete_auth("mockplayer")
+        if dump(initPrivs) ~= dump(nativePrivs) then return true, "Engine notified of auth change"
+        else return false, "Engine not notified of auth change" end
+    end
+})
+
+core.register_chatcommand("test_notify_authentication_modified", {
+    description="Calls both Lua and native notify_authentication_modified to test functionality",
+    func=function ()
+        authHandler.delete_auth("mockplayer")
+        authHandler.create_auth("mockplayer", "asdfjkl;")
+
+        local initPrivs = core.get_player_privs("mockplayer")
+        authHandler.set_privileges("mockplayer", testPrivs, true)
+        local luaPrivs = core.registered_privileges["mockplayer"]
+        authHandler.set_privileges("mockplayer", initPrivs, true)
+
+        authHandler.delete_auth("mockplayer")
+
+        authHandler.delete_auth("mockplayer")
+        authHandler.create_auth("mockplayer", "asdfjkl;")
+
+        local initPrivs = core.get_player_privs("mockplayer")
+        authHandler.set_privileges("mockplayer", testPrivs, false)
+        local nativePrivs = core.registered_privileges["mockplayer"]
+        authHandler.set_privileges("mockplayer", initPrivs, false)
+
+        authHandler.delete_auth("mockplayer")
+
+        if dump(luaPrivs) == dump(nativePrivs) then return true, "Lua and native privs set to same value!"
+        else return false, "Lua and native privs not set to same value"..dump(luaPrivs)..dump(nativePrivs) end
+    end
+})
 core.register_chatcommand("lua_get_last_run_mod", {
     description="Invokes lua_api > get_last_run_mod",
     func = function ()
